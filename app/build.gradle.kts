@@ -2,16 +2,20 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.kotlinSerialization)
+    alias(libs.plugins.ksp)
+    alias(libs.plugins.hilt)
+    alias(libs.plugins.ktorfit)
 }
 
 android {
-    namespace = "com.example.routor"
-    compileSdk = 34
+    namespace = "routor"
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.example.routor"
-        minSdk = 24
-        targetSdk = 34
+        minSdk = 26
+        targetSdk = 35
         versionCode = 1
         versionName = "1.0"
 
@@ -33,6 +37,7 @@ android {
     }
     kotlinOptions {
         jvmTarget = "11"
+        freeCompilerArgs += "-Xskip-metadata-version-check"
     }
     buildFeatures {
         compose = true
@@ -56,4 +61,27 @@ dependencies {
     androidTestImplementation(libs.androidx.ui.test.junit4)
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
+
+
+    implementation(libs.ktor.client.core)
+    implementation(libs.ktor.client.content.negotiation)
+    implementation(libs.ktor.serialization.kotlinx.json)
+    implementation(libs.ktor.client.cio)
+    implementation(libs.ktor.logging)
+    implementation(libs.ktor.ktorfit)
+
+    implementation(libs.google.location)
+    implementation(libs.serialization.json)
+    implementation(libs.androidx.appcompat)
+    implementation(libs.kotlinx.datetime)
+    implementation(libs.kotlinx.metadata.jvm)
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.androidx.localbroadcastmanager)
+    implementation(libs.room.runtime)
+    implementation(libs.room.ktx)
+    ksp(libs.room.compiler)
+
+    implementation(libs.hilt)
+    implementation(libs.hilt.navigation)
+    ksp(libs.hilt.compiler)
 }
