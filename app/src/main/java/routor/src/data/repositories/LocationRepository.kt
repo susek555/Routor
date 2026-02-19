@@ -38,6 +38,7 @@ class LocationRepository @Inject constructor(
         currentRouteId = null
         recordingStartTime = null
         numberOfPointsOnRoute = 0
+        _locationStatsFlow.value = LocationStats()
     }
 
     private var totalDistanceKilometers: Float = 0f

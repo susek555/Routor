@@ -84,4 +84,6 @@ dependencies {
     implementation(libs.hilt)
     implementation(libs.hilt.navigation)
     ksp(libs.hilt.compiler)
+
+    implementation(libs.osmdroid)
 }

@@ -96,7 +96,8 @@ class RoutesViewModel @Inject constructor(
             _routeDialogConfig.value = dialogFactory.create(
                 ConfirmDialogConfigState.DeleteRoute,
                 onConfirm = { onEvent(RoutesScreenEvent.DeleteRoute(route))},
-                onDismiss = { onEvent(RoutesScreenEvent.HideRouteDialog)}
+                onDismiss = { onEvent(RoutesScreenEvent.HideRouteDialog)},
+                routeName = route.name
             )
         }
     }

@@ -22,6 +22,7 @@ hiltNavigation = "1.2.0"
 ktor = "3.0.1"
 ktorfit = "2.0.0"  # do not update
 kotlinx-metadata = "0.9.0"
+osmdroid = "6.1.20"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -58,6 +59,7 @@ ktor-serialization-kotlinx-json = { module = "io.ktor:ktor-serialization-kotlinx
 ktor-logging = { group = "io.ktor", name = "ktor-client-logging", version.ref = "ktor"}
 ktor-ktorfit = { group = "de.jensklingenberg.ktorfit", name = "ktorfit-lib", version.ref = "ktorfit"}
 kotlinx-metadata-jvm = { group = "org.jetbrains.kotlinx", name = "kotlinx-metadata-jvm", version.ref = "kotlinx-metadata"}
+osmdroid = { group = "org.osmdroid", name = "osmdroid-android", version.ref = "osmdroid"}
 
 
 [plugins]
