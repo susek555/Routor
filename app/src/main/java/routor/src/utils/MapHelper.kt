@@ -1,7 +1,9 @@
 package routor.src.utils
 
 import android.content.Context
+import android.graphics.Point
 import android.view.View
+import androidx.core.graphics.contains
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.views.CustomZoomButtonsController
 import org.osmdroid.views.MapView
@@ -26,15 +28,16 @@ object MapHelper {
             val compass = createCompass(this, context)
             val rotation = createRotation(this, compass)
 
-            // Overlays init
-            overlays.add(rotation)
+            // Overlays init (by priority)
             overlays.add(compass)
+            overlays.add(rotation)
         }
     }
 
     private fun createCompass(mapView: MapView, context: Context): CompassOverlay {
         val provider = object : IOrientationProvider {
             override fun startOrientationProvider(orientationConsumer: IOrientationConsumer?): Boolean {
+                orientationConsumer?.onOrientationChanged(0f, this)
                 return true
             }
             override fun stopOrientationProvider() {}
@@ -42,7 +45,26 @@ object MapHelper {
             override fun destroy() {}
         }
 
-        return CompassOverlay(context, provider, mapView).apply {
+        //set north if clicked
+        return object : CompassOverlay(context, provider, mapView){
+            override fun onSingleTapUp(e: android.view.MotionEvent?, mapView: MapView?): Boolean {
+                if (e == null || mapView == null) return false
+
+                val location = IntArray(2)
+                mapView.getLocationOnScreen(location)
+
+                val screenX = (e.rawX - location[0]).toInt()
+                val screenY = (e.rawY - location[1]).toInt()
+
+                if (mCompassFrameBitmap.contains(Point(screenX, screenY))) {
+                    mapView.mapOrientation = 0f
+                    this.onOrientationChanged(0f, null)
+                    mapView.invalidate()
+                    return true
+                }
+                return super.onSingleTapUp(e, mapView)
+            }
+        }.apply {
             enableCompass()
         }
     }
