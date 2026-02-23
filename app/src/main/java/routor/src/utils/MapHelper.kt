@@ -1,94 +1,70 @@
 package routor.src.utils
 
-import android.animation.ValueAnimator
 import android.content.Context
-import android.graphics.Point
-import android.view.View
-import android.view.animation.DecelerateInterpolator
-import androidx.core.graphics.contains
-import org.osmdroid.tileprovider.tilesource.TileSourceFactory
-import org.osmdroid.views.CustomZoomButtonsController
-import org.osmdroid.views.MapView
-import org.osmdroid.views.overlay.compass.CompassOverlay
-import org.osmdroid.views.overlay.compass.IOrientationConsumer
-import org.osmdroid.views.overlay.compass.IOrientationProvider
-import org.osmdroid.views.overlay.gestures.RotationGestureOverlay
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
+import org.maplibre.android.MapLibre
+import org.maplibre.android.WellKnownTileServer
+import org.maplibre.android.camera.CameraPosition
+import org.maplibre.android.camera.CameraUpdateFactory
+import org.maplibre.android.maps.MapView
+import org.maplibre.android.maps.MapLibreMap
+
+private const val mapStyleUrl = "https://tiles.openfreemap.org/styles/liberty"
 
 object MapHelper {
+    private fun init(context: Context) {
+        MapLibre.getInstance(context, null, WellKnownTileServer.MapLibre)
+    }
+
     fun getMapView(context: Context): MapView {
-        return MapView(context).apply {
-            id = View.generateViewId()
-            setTileSource(TileSourceFactory.MAPNIK)
-            setMultiTouchControls(true)
+        init(context)
+        val mapView = MapView(context)
 
-            // UI & Performance
-            zoomController.setVisibility(CustomZoomButtonsController.Visibility.NEVER)
-            setLayerType(View.LAYER_TYPE_HARDWARE, null)
-            isTilesScaledToDpi = true
+        mapView.getMapAsync { map ->
+            map.setStyle(mapStyleUrl) {}
 
-            // Components init
-            val compass = createCompass(this, context)
-            val rotation = createRotation(this, compass)
+            map.uiSettings.apply {
+                isCompassEnabled = true
+                isRotateGesturesEnabled = true
+                isTiltGesturesEnabled = false
+                setCompassMargins(50, 50, 50, 50)
+            }
 
-            // Overlays init (by priority)
-            overlays.add(compass)
-            overlays.add(rotation)
+            map.addOnCameraMoveListener {}
+        }
+
+        return mapView
+    }
+
+    @Composable
+    fun SetupMapLifecycleEvents(mapView: MapView){
+        LifecycleEventEffect(Lifecycle.Event.ON_CREATE) { mapView.onCreate(null) }
+        LifecycleEventEffect(Lifecycle.Event.ON_START) { mapView.onStart() }
+        LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { mapView.onResume() }
+        LifecycleEventEffect(Lifecycle.Event.ON_PAUSE) { mapView.onPause() }
+        LifecycleEventEffect(Lifecycle.Event.ON_STOP) { mapView.onStop() }
+
+        DisposableEffect(mapView) {
+            onDispose {
+                mapView.onStop()
+                mapView.onDestroy()
+            }
         }
     }
 
-    private fun createCompass(mapView: MapView, context: Context): CompassOverlay {
-        val provider = object : IOrientationProvider {
-            override fun startOrientationProvider(orientationConsumer: IOrientationConsumer?): Boolean {
-                orientationConsumer?.onOrientationChanged(0f, this)
-                return true
-            }
-            override fun stopOrientationProvider() {}
-            override fun getLastKnownOrientation(): Float = 0f
-            override fun destroy() {}
-        }
-
-        //set north if clicked
-        return object : CompassOverlay(context, provider, mapView){
-            override fun onSingleTapUp(e: android.view.MotionEvent?, mapView: MapView?): Boolean {
-                if (e == null || mapView == null) return false
-
-                val location = IntArray(2)
-                mapView.getLocationOnScreen(location)
-
-                val screenX = (e.rawX - location[0]).toInt()
-                val screenY = (e.rawY - location[1]).toInt()
-
-                if (mCompassFrameBitmap.contains(Point(screenX, screenY))) {
-                    val currentRotation = mapView.mapOrientation
-                    ValueAnimator.ofFloat(currentRotation, 0f).apply {
-                        duration = 500
-                        interpolator = DecelerateInterpolator()
-
-                        addUpdateListener { animator ->
-                            val animatedValue = animator.animatedValue as Float
-                            mapView.mapOrientation = animatedValue
-                            onOrientationChanged(-animatedValue, null)
-                            mapView.invalidate()
-                        }
-                        start()
-                    }
-                    return true
-                }
-                return super.onSingleTapUp(e, mapView)
-            }
-        }.apply {
-            enableCompass()
-        }
-    }
-
-    private fun createRotation(mapView: MapView, compassOverlay: CompassOverlay): RotationGestureOverlay {
-        return object : RotationGestureOverlay(mapView) {
-            override fun onRotate(deltaAngle: Float) {
-                super.onRotate(deltaAngle)
-                compassOverlay.onOrientationChanged(-mapView.mapOrientation, null)
-            }
-        }.apply {
-            isEnabled = true
-        }
+    //TODO remove if still unused
+    fun resetToNorth(map: MapLibreMap) {
+        val currentPos = map.cameraPosition
+        val cameraUpdate = CameraUpdateFactory.newCameraPosition(
+            CameraPosition.Builder()
+                .bearing(0.0)
+                .target(currentPos.target)
+                .zoom(currentPos.zoom)
+                .build()
+        )
+        map.animateCamera(cameraUpdate, 500)
     }
 }

@@ -1,11 +1,9 @@
 package routor.src.screens.main
 
-import android.view.View
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -21,15 +19,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.compose.LifecycleEventEffect
-import org.osmdroid.tileprovider.tilesource.TileSourceFactory
-import org.osmdroid.util.GeoPoint
-import org.osmdroid.views.CustomZoomButtonsController
-import org.osmdroid.views.MapView
-import org.osmdroid.views.overlay.compass.CompassOverlay
-import org.osmdroid.views.overlay.compass.InternalCompassOrientationProvider
-import org.osmdroid.views.overlay.gestures.RotationGestureOverlay
 import routor.src.dialogFactory.confirmDialog.ConfirmDialog
 import routor.src.location.LocationStats
 import routor.src.utils.MapHelper
@@ -63,9 +52,7 @@ fun MainScreen(
     val mapView = remember {
         MapHelper.getMapView(context)
     }
-    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { mapView.onResume() }
-    LifecycleEventEffect(Lifecycle.Event.ON_PAUSE) { mapView.onPause() }
-
+    MapHelper.SetupMapLifecycleEvents(mapView)
 
     Box(
         modifier = Modifier
@@ -81,17 +68,19 @@ fun MainScreen(
             Text("My Routes")
         }
         AndroidView(
-            factory = { context ->
+            factory = {
                 mapView.apply {
-                    mapOrientation = 0f
-                    controller.setZoom(15.0)
-                    controller.setCenter(GeoPoint(52.2297, 21.0122))
+                    getMapAsync { map ->
+                        val startPos = org.maplibre.android.camera.CameraPosition.Builder()
+                            .target(org.maplibre.android.geometry.LatLng(52.2297, 21.0122))
+                            .zoom(15.0)
+                            .build()
+
+                        map.moveCamera(org.maplibre.android.camera.CameraUpdateFactory.newCameraPosition(startPos))
+                    }
                 }
             },
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .offset(y = 60.dp)
-                .size(400.dp),
+            modifier = Modifier.fillMaxSize(),
             update = {}
         )
         Text(

@@ -85,5 +85,5 @@ dependencies {
     implementation(libs.hilt.navigation)
     ksp(libs.hilt.compiler)
 
-    implementation(libs.osmdroid)
+    implementation(libs.maplibre)
 }
