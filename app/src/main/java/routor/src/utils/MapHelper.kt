@@ -11,46 +11,50 @@ import org.osmdroid.views.overlay.compass.IOrientationProvider
 import org.osmdroid.views.overlay.gestures.RotationGestureOverlay
 
 object MapHelper {
-    fun getMapView(context: Context): MapView{
+    fun getMapView(context: Context): MapView {
         return MapView(context).apply {
             id = View.generateViewId()
-            //source
             setTileSource(TileSourceFactory.MAPNIK)
-            //gestures
             setMultiTouchControls(true)
-            //rotation
-            val rotationOverlay = RotationGestureOverlay(this)
-            rotationOverlay.isEnabled = true
-            overlays.add(rotationOverlay)
-            //hide default buttons
+
+            // UI & Performance
             zoomController.setVisibility(CustomZoomButtonsController.Visibility.NEVER)
-            //caching tiles to smooth map moving
             setLayerType(View.LAYER_TYPE_HARDWARE, null)
             isTilesScaledToDpi = true
-            //compass
-            val compassOverlay = CompassOverlay(context, getOrientationProvider(context), this)
-            compassOverlay.enableCompass()
-            overlays.add(compassOverlay)
+
+            // Components init
+            val compass = createCompass(this, context)
+            val rotation = createRotation(this, compass)
+
+            // Overlays init
+            overlays.add(rotation)
+            overlays.add(compass)
         }
     }
 
-    private fun getOrientationProvider(context: Context): IOrientationProvider {
-        return object : IOrientationProvider {
-            private var consumer: IOrientationConsumer? = null
-
+    private fun createCompass(mapView: MapView, context: Context): CompassOverlay {
+        val provider = object : IOrientationProvider {
             override fun startOrientationProvider(orientationConsumer: IOrientationConsumer?): Boolean {
-                consumer = orientationConsumer
-                consumer?.onOrientationChanged(0f, this)
                 return true
             }
-
-            override fun stopOrientationProvider() {
-                consumer = null
-            }
-
+            override fun stopOrientationProvider() {}
             override fun getLastKnownOrientation(): Float = 0f
-
             override fun destroy() {}
+        }
+
+        return CompassOverlay(context, provider, mapView).apply {
+            enableCompass()
+        }
+    }
+
+    private fun createRotation(mapView: MapView, compassOverlay: CompassOverlay): RotationGestureOverlay {
+        return object : RotationGestureOverlay(mapView) {
+            override fun onRotate(deltaAngle: Float) {
+                super.onRotate(deltaAngle)
+                compassOverlay.onOrientationChanged(-mapView.mapOrientation, null)
+            }
+        }.apply {
+            isEnabled = true
         }
     }
 }
