@@ -1,8 +1,10 @@
 package routor.src.utils
 
+import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.Point
 import android.view.View
+import android.view.animation.DecelerateInterpolator
 import androidx.core.graphics.contains
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.views.CustomZoomButtonsController
@@ -57,9 +59,19 @@ object MapHelper {
                 val screenY = (e.rawY - location[1]).toInt()
 
                 if (mCompassFrameBitmap.contains(Point(screenX, screenY))) {
-                    mapView.mapOrientation = 0f
-                    this.onOrientationChanged(0f, null)
-                    mapView.invalidate()
+                    val currentRotation = mapView.mapOrientation
+                    ValueAnimator.ofFloat(currentRotation, 0f).apply {
+                        duration = 500
+                        interpolator = DecelerateInterpolator()
+
+                        addUpdateListener { animator ->
+                            val animatedValue = animator.animatedValue as Float
+                            mapView.mapOrientation = animatedValue
+                            onOrientationChanged(-animatedValue, null)
+                            mapView.invalidate()
+                        }
+                        start()
+                    }
                     return true
                 }
                 return super.onSingleTapUp(e, mapView)
