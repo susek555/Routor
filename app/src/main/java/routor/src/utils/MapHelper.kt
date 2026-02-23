@@ -30,7 +30,7 @@ object MapHelper {
                 isCompassEnabled = true
                 isRotateGesturesEnabled = true
                 isTiltGesturesEnabled = false
-                setCompassMargins(50, 50, 50, 50)
+                setCompassMargins(50, 300, 50, 50)
             }
 
             map.addOnCameraMoveListener {}

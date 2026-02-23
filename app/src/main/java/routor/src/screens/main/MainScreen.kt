@@ -1,7 +1,13 @@
 package routor.src.screens.main
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
@@ -13,6 +19,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -54,113 +61,101 @@ fun MainScreen(
     }
     MapHelper.SetupMapLifecycleEvents(mapView)
 
-    Box(
+    Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(20.dp)
     ) {
-        Button(
+        Box(
             modifier = Modifier
-                .align(Alignment.TopEnd)
-                .offset(x = 0.dp, y = 20.dp),
-            onClick = displayRoutesScreen
-        ){
-            Text("My Routes")
-        }
-        AndroidView(
-            factory = {
-                mapView.apply {
-                    getMapAsync { map ->
-                        val startPos = org.maplibre.android.camera.CameraPosition.Builder()
-                            .target(org.maplibre.android.geometry.LatLng(52.2297, 21.0122))
-                            .zoom(15.0)
-                            .build()
+                .fillMaxSize()
+                .weight(3f),
+        ) {
+            AndroidView(
+                factory = {
+                    mapView.apply {
+                        getMapAsync { map ->
+                            val startPos = org.maplibre.android.camera.CameraPosition.Builder()
+                                .target(org.maplibre.android.geometry.LatLng(52.2297, 21.0122))
+                                .zoom(15.0)
+                                .build()
 
-                        map.moveCamera(org.maplibre.android.camera.CameraUpdateFactory.newCameraPosition(startPos))
+                            map.moveCamera(org.maplibre.android.camera.CameraUpdateFactory.newCameraPosition(startPos))
+                        }
+                    }
+                },
+                update = {}
+            )
+            Button(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .offset(x = (-20).dp, y = 40.dp),
+                onClick = displayRoutesScreen
+            ){
+                Text("My Routes")
+            }
+        }
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .weight(2f)
+                .padding(20.dp)
+        ) {
+            Column(
+                modifier = Modifier.fillMaxSize(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.SpaceBetween
+            ) {
+                //stats
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = "STATS",
+                        style = TextStyle(fontWeight = FontWeight.Light, fontSize = 12.sp)
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceEvenly
+                    ) {
+                        StatItem(label = "DISTANCE", value = "${locationStats.totalDistanceKm} km")
+                        StatItem(label = "SPEED", value = "${locationStats.speedKmh} km/h")
+                        StatItem(label = "DURATION", value = formatTime(duration))
+                    }
+
+                    if (isServiceRunning) {
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Text(
+                            text = "Points: ${locationStats.numberOfPointsOnRoute}",
+                            fontSize = 12.sp,
+                            color = Color.Gray
+                        )
                     }
                 }
-            },
-            modifier = Modifier.fillMaxSize(),
-            update = {}
-        )
-        Text(
-            text = "LOCATION:",
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .offset(x = 0.dp, y = 60.dp)
-        )
-        Text(
-            text = "Latitude = ${locationStats.latitude}",
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .offset(x = 0.dp, y = 90.dp)
-        )
-        Text(
-            text = "Longitude = ${locationStats.longitude}",
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .offset(x = 0.dp, y = 120.dp)
-        )
-        Text(
-            text = "Total distance = ${locationStats.totalDistanceKm} km",
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .offset(x = 0.dp, y = 150.dp)
-        )
-        Text(
-            text = "Current speed = ${locationStats.speedKmh} km/h",
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .offset(x = 0.dp, y = 180.dp)
-        )
 
-        if (isServiceRunning) {
-            Text(
-                text = "DURATION",
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .offset(x = 0.dp, y = (-20).dp),
-                style = TextStyle(
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 20.sp
-                )
-            )
-            Text(
-                text = formatTime(duration),
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .offset(x = 0.dp, y = 20.dp),
-                style = TextStyle(
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 20.sp
-                )
-            )
-            Text(
-                text = "Number of points on current route : ${locationStats.numberOfPointsOnRoute}",
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .offset(x = 0.dp, y = 90.dp)
-            )
-            StopButton(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .offset(x = 0.dp, y = (-100).dp),
-                onClick = {
-                    viewModel.onEvent(MainScreenEvent.ShowStopRouteDialog)
+                //buttons
+                Box(
+                    modifier = Modifier.padding(bottom = 50.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (isServiceRunning) {
+                        StopButton(onClick = { viewModel.onEvent(MainScreenEvent.ShowStopRouteDialog) })
+                    } else {
+                        StartButton(onClick = { viewModel.onEvent(MainScreenEvent.StartRoute) })
+                    }
                 }
-            )
-        } else {
-            StartButton(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .offset(x = 0.dp, y = (-100).dp),
-                onClick = {
-                    viewModel.onEvent(MainScreenEvent.StartRoute)
-                }
-            )
+            }
         }
     }
     if(stopRouteDialogState.isVisible){
         ConfirmDialog(stopRouteDialogState.config!!)
+    }
+}
+
+@Composable
+private fun StatItem(label: String, value: String) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(text = label, style = TextStyle(fontSize = 10.sp, fontWeight = FontWeight.Bold))
+        Text(text = value, style = TextStyle(fontSize = 18.sp, fontWeight = FontWeight.ExtraBold))
     }
 }

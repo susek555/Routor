@@ -82,7 +82,7 @@ fun RoundButton(
 
 @Composable
 fun StartButton(
-    modifier: Modifier,
+    modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
     RoundButton(
@@ -102,7 +102,7 @@ fun StartButton(
 
 @Composable
 fun StopButton(
-    modifier: Modifier,
+    modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
     RoundButton(
