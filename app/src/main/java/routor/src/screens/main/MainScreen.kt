@@ -1,21 +1,35 @@
 package routor.src.screens.main
 
+import android.view.View
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
+import org.osmdroid.tileprovider.tilesource.TileSourceFactory
+import org.osmdroid.util.GeoPoint
+import org.osmdroid.views.CustomZoomButtonsController
+import org.osmdroid.views.MapView
+import org.osmdroid.views.overlay.compass.CompassOverlay
+import org.osmdroid.views.overlay.compass.InternalCompassOrientationProvider
+import org.osmdroid.views.overlay.gestures.RotationGestureOverlay
 import routor.src.dialogFactory.confirmDialog.ConfirmDialog
 import routor.src.location.LocationStats
 import routor.src.utils.formatTime
@@ -42,6 +56,36 @@ fun MainScreen(
     val locationStats by viewModel.locationStats.collectAsState(initial = LocationStats())
     val duration by viewModel.elapsedTime.collectAsState()
 
+    //map
+    val context = LocalContext.current
+
+    val mapView = remember {
+        MapView(context).apply {
+            id = View.generateViewId()
+            //source
+            setTileSource(TileSourceFactory.MAPNIK)
+            //gestures
+            setMultiTouchControls(true)
+            //rotation
+            val rotationOverlay = RotationGestureOverlay(this)
+            rotationOverlay.isEnabled = true
+            overlays.add(rotationOverlay)
+            //hide default buttons
+            zoomController.setVisibility(CustomZoomButtonsController.Visibility.NEVER)
+            //caching tiles to smooth map moving
+            setLayerType(View.LAYER_TYPE_HARDWARE, null)
+            isTilesScaledToDpi = true
+            //compass
+//            val compassOverlay = CompassOverlay(context, this)
+//            compassOverlay.enableCompass()
+//            compassOverlay.isEnabled = true
+//            overlays.add(compassOverlay)
+        }
+    }
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { mapView.onResume() }
+    LifecycleEventEffect(Lifecycle.Event.ON_PAUSE) { mapView.onPause() }
+
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -55,6 +99,20 @@ fun MainScreen(
         ){
             Text("My Routes")
         }
+        AndroidView(
+            factory = { context ->
+                mapView.apply {
+                    mapOrientation = 0f
+                    controller.setZoom(15.0)
+                    controller.setCenter(GeoPoint(52.2297, 21.0122))
+                }
+            },
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .offset(y = 60.dp)
+                .size(400.dp),
+            update = {}
+        )
         Text(
             text = "LOCATION:",
             modifier = Modifier
