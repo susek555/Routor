@@ -4,14 +4,13 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import routor.src.data.types.Point
 import javax.inject.Inject
 import javax.inject.Singleton
 import routor.src.location.LocationStats
-import routor.src.location.LocationHelper
+import routor.src.utils.LocationHelper
 
 @Singleton
 class LocationRepository @Inject constructor(

@@ -1,7 +1,6 @@
-package routor.src.location
+package routor.src.utils
 
 import android.location.Location.distanceBetween
-import routor.src.data.types.Point
 
 object LocationHelper {
     fun getDistanceMeters(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Float {
