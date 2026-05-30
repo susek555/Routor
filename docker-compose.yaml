@@ -1,8 +1,0 @@
-services:
-  api:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    container_name: routor_api
-    ports:
-      - "8000:8000"

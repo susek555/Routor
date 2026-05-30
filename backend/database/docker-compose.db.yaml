@@ -1,0 +1,74 @@
+networks:
+  db_network:
+    driver: bridge
+
+volumes:
+  db_data:
+
+services:
+  db:
+    image: postgres:15
+    container_name: routor_db
+    environment:
+      POSTGRES_USER: routor_user
+      POSTGRES_PASSWORD: routor_password
+      POSTGRES_DB: routor_database
+      PGPASSWORD: routor_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      - ./schema.sql:/tmp/schema.sql:ro
+      - ./backups:/tmp/backups:ro
+      - ./init-db.sh:/docker-entrypoint-initdb.d/init-db.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U routor_user -d routor_database"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - db_network
+    stop_signal: SIGTERM
+    stop_grace_period: 35s
+
+  backup-cron:
+    image: postgres:15
+    container_name: backup_service
+    environment:
+      PGPASSWORD: routor_password
+    networks:
+      - db_network
+    volumes:
+      - ./backup.sh:/backup.sh:ro
+      - ./backups:/backups
+    depends_on:
+      - db
+    stop_signal: SIGTERM
+    stop_grace_period: 30s
+    entrypoint: |
+      bash -c "
+      echo '=== STEP 1: Installing cron ==='
+      apt-get update && apt-get install -y cron
+
+      echo '=== STEP 2: Configuring cron schedule (0 0 * * *) ==='
+      echo '0 0 * * * bash /backup.sh' > /etc/cron.d/backup-cron
+      chmod 0644 /etc/cron.d/backup-cron
+      crontab /etc/cron.d/backup-cron
+
+      echo '=== STEP 3: Starting cron daemon in background ==='
+      cron
+
+      echo '=== STEP 4: Activating TRAP for graceful shutdown backup ==='
+      stop_handler() {
+        echo 'SIGTERM signal intercepted! Running final shutdown backup...'
+        bash /backup.sh
+        exit 0
+      }
+      trap 'stop_handler' SIGTERM
+
+      echo 'Backup service is up, running, and waiting for signals...'
+      while true; do
+        sleep 1 & wait \$!
+      done
+      "
