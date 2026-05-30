@@ -14,5 +14,7 @@ data class Route(
     var id: Long = 0,
     val name: String,
     val numberOfPoints: Int,
-    val time: LocalDate
+    val date: LocalDate,
+    val duration: Long,
+    val distanceKm: Float
 )

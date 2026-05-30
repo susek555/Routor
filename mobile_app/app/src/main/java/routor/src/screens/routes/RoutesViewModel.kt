@@ -70,6 +70,8 @@ class RoutesViewModel @Inject constructor(
                 _isRouteDialogOpen.value = false
             }
             is RoutesScreenEvent.ShowEditRouteDialog -> {
+                //TODO remove print
+                println(event.route)
                 setDialogConfig(DialogConfig.EDIT, event.route)
                 _isRouteDialogOpen.value = true
             }

@@ -26,7 +26,6 @@ class MainActivity : ComponentActivity() {
 
     private lateinit var locationService: LocationService
     private var isLocationServiceBound: Boolean = false
-    private var isServiceRunning: Boolean = false
 
     //LOCATION SERVICE
 
@@ -44,28 +43,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-//    private fun isServiceRunning(serviceClass: Class<*>): Boolean {
-//        val manager = getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
-//        return manager.getRunningServices(Int.MAX_VALUE).any { it.service.className == serviceClass.name }
-//    }
-
-    private fun startLocationService() {
-        if (!isServiceRunning) {
-            Intent(this, LocationService::class.java).apply {
-                action = LocationService.ACTION_START
-                startService(this)
-            }
-            isServiceRunning = true
-        }
-    }
-
-    private fun stopLocationService() {
-        Intent(this, LocationService::class.java).apply {
-            action = LocationService.ACTION_STOP
-            startService(this)
-        }
-        isServiceRunning = false
-    }
 
     //PERMISSIONS RESPONSIBILITY
 
@@ -130,10 +107,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             RoutorTheme {
                 Scaffold(modifier = Modifier.fillMaxSize()) {  innerPadding ->
-                    NavigationController(
-                        startLocationService = { startLocationService() },
-                        stopLocationService = { stopLocationService() }
-                    )
+                    NavigationController()
 
                     if (isLocationServiceBound) {
                         Toast.makeText(this, "Service is running", Toast.LENGTH_SHORT).show()
@@ -155,6 +129,5 @@ class MainActivity : ComponentActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        stopLocationService()
     }
 }

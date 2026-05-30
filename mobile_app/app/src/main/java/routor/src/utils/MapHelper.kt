@@ -1,30 +1,131 @@
 package routor.src.utils
 
+import android.animation.ValueAnimator
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.view.animation.LinearInterpolator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import org.maplibre.android.MapLibre
 import org.maplibre.android.WellKnownTileServer
-import org.maplibre.android.camera.CameraPosition
 import org.maplibre.android.camera.CameraUpdateFactory
+import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.MapLibreMap
+import org.maplibre.android.maps.Style
+import org.maplibre.android.style.layers.Property
+import org.maplibre.android.style.layers.PropertyFactory
+import org.maplibre.android.style.layers.SymbolLayer
+import org.maplibre.android.style.sources.GeoJsonSource
+import org.maplibre.geojson.Feature
+import org.maplibre.geojson.FeatureCollection
+import org.maplibre.geojson.LineString
+import org.maplibre.geojson.Point
+import routor.R
 
-private const val mapStyleUrl = "https://tiles.openfreemap.org/styles/liberty"
+
 
 object MapHelper {
+    private const val MAP_STYLE_URL = "https://tiles.openfreemap.org/styles/liberty"
+    private const val USER_ICON_ID = "user-icon"
+    private const val USER_SOURCE_ID = "user-source"
+    private const val USER_LAYER_ID = "user-layer"
+    private const val ROUTE_SOURCE_ID = "route-source"
+    private const val ROUTE_LAYER_ID = "route-layer"
+    private const val START_ICON_ID = "start-icon"
+    private const val START_SOURCE_ID = "start-source"
+    private const val START_LAYER_ID = "start-layer"
+
     private fun init(context: Context) {
         MapLibre.getInstance(context, null, WellKnownTileServer.MapLibre)
     }
 
-    fun getMapView(context: Context): MapView {
+    private fun getBitmapFromVectorDrawable(context: Context, drawableId: Int): Bitmap {
+        val drawable = ContextCompat.getDrawable(context, drawableId)!!
+        val bitmap = Bitmap.createBitmap(
+            drawable.intrinsicWidth,
+            drawable.intrinsicHeight,
+            Bitmap.Config.ARGB_8888
+        )
+        val canvas = Canvas(bitmap)
+        drawable.setBounds(0, 0, canvas.width, canvas.height)
+        drawable.draw(canvas)
+        return bitmap
+    }
+
+    private fun setupUserLocationLayer(style: Style, context: Context) {
+        val bitmap = getBitmapFromVectorDrawable(context, R.drawable.user_location_dot)
+        style.addImage(USER_ICON_ID, bitmap)
+
+        val emptySource = GeoJsonSource(USER_SOURCE_ID)
+        style.addSource(emptySource)
+
+        val symbolLayer = SymbolLayer(USER_LAYER_ID, USER_SOURCE_ID)
+        symbolLayer.setProperties(
+            PropertyFactory.iconImage(USER_ICON_ID),
+            PropertyFactory.iconAllowOverlap(true),
+            PropertyFactory.iconIgnorePlacement(true),
+            PropertyFactory.iconRotationAlignment(Property.ICON_ROTATION_ALIGNMENT_VIEWPORT),
+        )
+        style.addLayer(symbolLayer)
+    }
+
+    private fun setupRouteLayer(style: Style) {
+        val geoJsonSource = GeoJsonSource(ROUTE_SOURCE_ID)
+        style.addSource(geoJsonSource)
+
+        val lineLayer = org.maplibre.android.style.layers.LineLayer(ROUTE_LAYER_ID, ROUTE_SOURCE_ID)
+        lineLayer.setProperties(
+            PropertyFactory.lineColor(android.graphics.Color.parseColor("#4285F4")),
+            PropertyFactory.lineWidth(5f),
+            PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND),
+            PropertyFactory.lineCap(Property.LINE_CAP_ROUND),
+            PropertyFactory.lineOpacity(0.8f)
+        )
+
+        if (style.getLayer(USER_LAYER_ID) != null) {
+            style.addLayerBelow(lineLayer, USER_LAYER_ID)
+        } else {
+            style.addLayer(lineLayer)
+        }
+    }
+
+    private fun setupStartLocationLayer(style: Style, context: Context) {
+        val bitmap = getBitmapFromVectorDrawable(context, R.drawable.route_begin_dot)
+        style.addImage(START_ICON_ID, bitmap)
+
+        val emptySource = GeoJsonSource(START_SOURCE_ID)
+        style.addSource(emptySource)
+
+        val symbolLayer = SymbolLayer(START_LAYER_ID, START_SOURCE_ID)
+        symbolLayer.setProperties(
+            PropertyFactory.iconImage(START_ICON_ID),
+            PropertyFactory.iconAllowOverlap(true),
+            PropertyFactory.iconIgnorePlacement(true),
+            PropertyFactory.iconRotationAlignment(Property.ICON_ROTATION_ALIGNMENT_VIEWPORT)
+        )
+
+        style.addLayerAbove(symbolLayer, ROUTE_LAYER_ID)
+    }
+
+    private fun getMapView(context: Context, hasUserLocation: Boolean, hasRouteLayer: Boolean): MapView {
         init(context)
         val mapView = MapView(context)
 
         mapView.getMapAsync { map ->
-            map.setStyle(mapStyleUrl) {}
+            map.setStyle(MAP_STYLE_URL) { style ->
+                if(hasUserLocation) {
+                    setupUserLocationLayer(style, context)
+                }
+                if(hasRouteLayer) {
+                    setupRouteLayer(style)
+                    setupStartLocationLayer(style, context)
+                }
+            }
 
             map.uiSettings.apply {
                 isCompassEnabled = true
@@ -37,6 +138,22 @@ object MapHelper {
         }
 
         return mapView
+    }
+
+    fun getMainScreenMapView(context: Context): MapView {
+        return getMapView(
+            context = context,
+            hasUserLocation = true,
+            hasRouteLayer = true
+        )
+    }
+
+    fun getRouteScreenMapView(context: Context): MapView {
+        return getMapView(
+            context = context,
+            hasUserLocation = false,
+            hasRouteLayer = true
+        )
     }
 
     @Composable
@@ -55,16 +172,90 @@ object MapHelper {
         }
     }
 
-    //TODO remove if still unused
-    fun resetToNorth(map: MapLibreMap) {
-        val currentPos = map.cameraPosition
-        val cameraUpdate = CameraUpdateFactory.newCameraPosition(
-            CameraPosition.Builder()
-                .bearing(0.0)
-                .target(currentPos.target)
-                .zoom(currentPos.zoom)
-                .build()
-        )
-        map.animateCamera(cameraUpdate, 500)
+    fun centerCameraOnUserLocation(mapView: MapView, latLng: LatLng) {
+        mapView.getMapAsync { map ->
+            val style = map.style ?: return@getMapAsync
+            val source = style.getSourceAs<GeoJsonSource>(USER_SOURCE_ID) ?: return@getMapAsync
+
+            val point = Point.fromLngLat(latLng.longitude, latLng.latitude)
+            source.setGeoJson(Feature.fromGeometry(point))
+
+            val cameraUpdate = CameraUpdateFactory.newLatLngZoom(latLng, 15.0)
+            map.animateCamera(cameraUpdate, 1000)
+        }
+    }
+
+    private fun animateRouteUpdate(style: Style, oldAnimator: ValueAnimator?, latLng: LatLng)  : ValueAnimator? {
+        val source = style.getSourceAs<GeoJsonSource>(USER_SOURCE_ID) ?: return null
+
+        val lastFeature = source.querySourceFeatures(null).firstOrNull()
+        val lastPoint = lastFeature?.geometry() as? Point
+
+        if (lastPoint == null){
+            val point = Point.fromLngLat(latLng.longitude, latLng.latitude)
+            source.setGeoJson(Feature.fromGeometry(point))
+            return null
+        }
+
+        oldAnimator?.cancel()
+
+        val newAnimator = ValueAnimator.ofFloat(0f, 1f).apply{
+            duration = 1000
+            interpolator = LinearInterpolator()
+
+            addUpdateListener { animation  ->
+                val fraction = animation.animatedValue as Float
+
+                val lon = lastPoint.longitude() + (latLng.longitude - lastPoint.longitude()) * fraction
+                val lat = lastPoint.latitude() + (latLng.latitude - lastPoint.latitude()) * fraction
+
+                val intermediatePoint = Point.fromLngLat(lon, lat)
+                source.setGeoJson(Feature.fromGeometry(intermediatePoint))
+            }
+            start()
+        }
+        return newAnimator
+    }
+
+    fun updateRoute(mapView: MapView, points: List<LatLng>) {
+        mapView.getMapAsync { map ->
+            val style = map.style ?: return@getMapAsync
+            val routeSource = style.getSourceAs<GeoJsonSource>(ROUTE_SOURCE_ID) ?: return@getMapAsync
+            val startSource = style.getSourceAs<GeoJsonSource>(START_SOURCE_ID) ?: return@getMapAsync
+
+            if (points.isEmpty()) {
+                clearRoute(mapView)
+                return@getMapAsync
+            }
+
+            // start point
+            val firstPoint = Point.fromLngLat(points.first().longitude, points.first().latitude)
+            startSource.setGeoJson(Feature.fromGeometry(firstPoint))
+
+            // route line
+//            if (points.size >= 3) {
+//                val routePoints = points.dropLast(1).map { Point.fromLngLat(it.longitude, it.latitude) }
+            if (points.size >= 2) {
+                val routePoints = points.map { Point.fromLngLat(it.longitude, it.latitude) }
+                val lineString = LineString.fromLngLats(routePoints)
+                routeSource.setGeoJson(Feature.fromGeometry(lineString))
+            }
+
+            //animations
+            val oldAnimator = mapView.getTag(R.id.map_animator_tag) as? ValueAnimator
+            val newAnimator = animateRouteUpdate(style, oldAnimator, points.last())
+            mapView.setTag(R.id.map_animator_tag, newAnimator)
+        }
+    }
+
+    fun clearRoute(mapView: MapView) {
+        mapView.getMapAsync { map ->
+            val style = map.style ?: return@getMapAsync
+            val routeSource = style.getSourceAs<GeoJsonSource>(ROUTE_SOURCE_ID)
+            val startSource = style.getSourceAs<GeoJsonSource>(START_SOURCE_ID)
+
+            routeSource?.setGeoJson(FeatureCollection.fromFeatures(emptyList()))
+            startSource?.setGeoJson(FeatureCollection.fromFeatures(emptyList()))
+        }
     }
 }

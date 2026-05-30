@@ -11,10 +11,7 @@ import routor.src.screens.routes.RoutesScreen
 import routor.src.screens.routes.RoutesViewModel
 
 @Composable
-fun NavigationController(
-    startLocationService: () -> Unit,
-    stopLocationService: () -> Unit,
-) {
+fun NavigationController() {
     val navController = rememberNavController()
 
     NavHost(
@@ -24,8 +21,6 @@ fun NavigationController(
         composable("MainScreen") { backStackEntry ->
             MainScreen(
                 viewModel = hiltViewModel<MainViewModel>(backStackEntry),
-                startLocationService = startLocationService,
-                stopLocationService = stopLocationService,
                 displayRoutesScreen = {
                     navController.navigate("RoutesScreen")
                 }

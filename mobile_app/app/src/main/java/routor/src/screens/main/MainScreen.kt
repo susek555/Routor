@@ -10,7 +10,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Place
 import androidx.compose.material3.Button
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -27,39 +31,49 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import routor.src.dialogFactory.confirmDialog.ConfirmDialog
-import routor.src.location.LocationStats
+import routor.src.data.types.RouteStats
 import routor.src.utils.MapHelper
 import routor.src.utils.formatTime
 
 @Composable
 fun MainScreen(
-    startLocationService: () -> Unit,
-    stopLocationService: () -> Unit,
     displayRoutesScreen: () -> Unit,
     viewModel: MainViewModel
 ) {
-    val isServiceRunning by viewModel.isLocationServiceOn.collectAsState()
-
-    LaunchedEffect(isServiceRunning){
-        if(isServiceRunning){
-            startLocationService()
-        } else {
-            stopLocationService()
-        }
-    }
-
+    val isServiceRecordingRoute by viewModel.isServiceRecordingRoute.collectAsState()
     val stopRouteDialogState by viewModel.stopRouteDialogState.collectAsState()
 
-    val locationStats by viewModel.locationStats.collectAsState(initial = LocationStats())
+    val currentLocation by viewModel.currentLocation.collectAsState()
+    val routeStats by viewModel.locationStats.collectAsState(initial = RouteStats())
     val duration by viewModel.elapsedTime.collectAsState()
 
     //map
     val context = LocalContext.current
-
     val mapView = remember {
-        MapHelper.getMapView(context)
+        MapHelper.getMainScreenMapView(context)
     }
     MapHelper.SetupMapLifecycleEvents(mapView)
+
+    //map centered on location
+    LaunchedEffect(Unit) {
+        viewModel.centerMapEvent.collect {
+            currentLocation?.let { loc ->
+                MapHelper.centerCameraOnUserLocation(mapView, loc)
+            }
+        }
+    }
+
+    //follow route
+    LaunchedEffect(routeStats.points) {
+        if(isServiceRecordingRoute){
+            MapHelper.updateRoute(mapView, routeStats.points)
+        }
+    }
+
+    // clear route on start or stop recording
+    LaunchedEffect(isServiceRecordingRoute) {
+        MapHelper.clearRoute(mapView)
+    }
 
     Column(
         modifier = Modifier
@@ -71,28 +85,25 @@ fun MainScreen(
                 .weight(3f),
         ) {
             AndroidView(
-                factory = {
-                    mapView.apply {
-                        getMapAsync { map ->
-                            val startPos = org.maplibre.android.camera.CameraPosition.Builder()
-                                .target(org.maplibre.android.geometry.LatLng(52.2297, 21.0122))
-                                .zoom(15.0)
-                                .build()
-
-                            map.moveCamera(org.maplibre.android.camera.CameraUpdateFactory.newCameraPosition(startPos))
-                        }
-                    }
-                },
+                factory = { mapView },
                 update = {}
             )
-            Button(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .offset(x = (-20).dp, y = 40.dp),
-                onClick = displayRoutesScreen
-            ){
-                Text("My Routes")
+            if (!isServiceRecordingRoute) {
+                Button(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .offset(x = (-20).dp, y = 40.dp),
+                    onClick = displayRoutesScreen
+                ) {
+                    Text("My Routes")
+                }
             }
+            FloatingActionButton(
+                onClick = {viewModel.onEvent(MainScreenEvent.CenterMapOnCurrentLocation)},
+                modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(16.dp)
+            ) { Icon(imageVector = Icons.Default.Place, contentDescription = "Center Map") }
         }
         Box(
             modifier = Modifier
@@ -118,15 +129,15 @@ fun MainScreen(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceEvenly
                     ) {
-                        StatItem(label = "DISTANCE", value = "${locationStats.totalDistanceKm} km")
-                        StatItem(label = "SPEED", value = "${locationStats.speedKmh} km/h")
+                        StatItem(label = "DISTANCE", value = "${"%.2f".format(routeStats.totalDistanceKm)} km")
+                        StatItem(label = "SPEED", value = "${"%.2f".format(routeStats.speedKmh)} km/h")
                         StatItem(label = "DURATION", value = formatTime(duration))
                     }
 
-                    if (isServiceRunning) {
+                    if (isServiceRecordingRoute) {
                         Spacer(modifier = Modifier.height(10.dp))
                         Text(
-                            text = "Points: ${locationStats.numberOfPointsOnRoute}",
+                            text = "Points: ${routeStats.numberOfPointsOnRoute}",
                             fontSize = 12.sp,
                             color = Color.Gray
                         )
@@ -138,7 +149,7 @@ fun MainScreen(
                     modifier = Modifier.padding(bottom = 50.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    if (isServiceRunning) {
+                    if (isServiceRecordingRoute) {
                         StopButton(onClick = { viewModel.onEvent(MainScreenEvent.ShowStopRouteDialog) })
                     } else {
                         StartButton(onClick = { viewModel.onEvent(MainScreenEvent.StartRoute) })

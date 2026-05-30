@@ -1,5 +1,7 @@
 package routor.src.screens.main
 
+import android.content.Context
+import android.content.Intent
 import android.os.SystemClock
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
@@ -10,37 +12,42 @@ import routor.src.dialogFactory.confirmDialog.ConfirmDialogFactory
 import routor.src.dialogFactory.confirmDialog.ConfirmDialogConfigState
 import routor.src.dialogFactory.confirmDialog.ConfirmDialogState
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.isActive
 import kotlinx.datetime.Clock
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import routor.src.data.repositories.LocationRepository
-import routor.src.data.repositories.PointRepository
 import routor.src.data.repositories.RouteRepository
-import routor.src.data.types.Point
 import routor.src.data.types.Route
-import routor.src.location.LocationStats
+import routor.src.location.LocationService
 import javax.inject.Inject
 
 @HiltViewModel
 class MainViewModel @Inject constructor(
     private val locationRepository: LocationRepository,
     private val routeRepository: RouteRepository,
-    private val dialogFactory: ConfirmDialogFactory
+    private val dialogFactory: ConfirmDialogFactory,
+    @ApplicationContext private val context: Context,
 ) : ViewModel() {
 
     val locationStats = locationRepository.locationStatsFlow
+    val currentLocation = locationRepository.currentLocation
 
-    private val _isLocationServiceOn = MutableStateFlow<Boolean>(false)
-    val isLocationServiceOn: StateFlow<Boolean> get() = _isLocationServiceOn
+    private val _isServiceRecordingRoute = MutableStateFlow(false)
+    val isServiceRecordingRoute = _isServiceRecordingRoute.asStateFlow()
 
     private var currentRoute: MutableState<Route?> = mutableStateOf(null)
 
@@ -57,6 +64,18 @@ class MainViewModel @Inject constructor(
     val stopRouteDialogState = combine(_isStopRouteDialogOpen, _stopRouteDialogConfig) {isVisible, config ->
         ConfirmDialogState(isVisible, config)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), ConfirmDialogState(false, null))
+    private val _centerMapEvent = MutableSharedFlow<Unit>(replay = 0)
+    val centerMapEvent = _centerMapEvent.asSharedFlow()
+
+     init {
+         viewModelScope.launch {
+             if (!_isServiceRecordingRoute.value){
+                 sendActionToLocationService(LocationService.ACTION_GET_SINGLE_LOCATION)
+                 delay(1000)
+                 _centerMapEvent.emit(Unit)
+             }
+         }
+    }
 
     fun onEvent(event: MainScreenEvent) {
         when(event) {
@@ -68,21 +87,48 @@ class MainViewModel @Inject constructor(
                 _isStopRouteDialogOpen.value = true
             }
             MainScreenEvent.StartRoute -> {
-                startRecording()
+                if(!_isServiceRecordingRoute.value){
+                    startRecording()
+                }
             }
             is MainScreenEvent.SaveRoute -> {
-                viewModelScope.launch { saveRoute(name = event.name) }
-                stopRecording()
-                _isStopRouteDialogOpen.value = false
+                if(_isServiceRecordingRoute.value){
+                    viewModelScope.launch { saveRoute(name = event.name) }
+                    stopRecording()
+                    _isStopRouteDialogOpen.value = false
+                }
             }
             MainScreenEvent.CancelRoute -> {
-                viewModelScope.launch { cancelRoute() }
-                stopRecording()
-                _isStopRouteDialogOpen.value = false
+                if(_isServiceRecordingRoute.value){
+                    viewModelScope.launch { cancelRoute() }
+                    stopRecording()
+                    _isStopRouteDialogOpen.value = false
+                }
+            }
+            MainScreenEvent.CenterMapOnCurrentLocation -> {
+                if (!_isServiceRecordingRoute.value){
+                    val oldLocation = currentLocation.value
+                    sendActionToLocationService(LocationService.ACTION_GET_SINGLE_LOCATION)
+                    viewModelScope.launch {
+                        currentLocation.first { it != oldLocation}
+                        _centerMapEvent.emit(Unit)
+                    }
+                } else {
+                    viewModelScope.launch { _centerMapEvent.emit(Unit) }
+                }
             }
         }
     }
 
+    //location service
+    private fun sendActionToLocationService(action: String) {
+        Intent(context, LocationService::class.java).apply {
+            this.action = action
+            context.startService(this)
+        }
+    }
+
+    //dialog
     private fun setDialogConfig() {
         if(locationStats.value.numberOfPointsOnRoute < minimumNumberOfPoints){
             _stopRouteDialogConfig.value = dialogFactory.create(
@@ -99,29 +145,37 @@ class MainViewModel @Inject constructor(
         }
     }
 
+    //recording
     private fun startRecording(){
-        //TODO remove prints
-        println("new route started")
         //prepare route
         viewModelScope.launch {
             val localDate = Clock.System.now()
                 .toLocalDateTime(TimeZone.currentSystemDefault())
                 .date
 
-            val newRoute = Route(name = "", numberOfPoints = 0, time = localDate)
+            val newRoute = Route(
+                name = "",
+                numberOfPoints = 0,
+                date = localDate,
+                duration = 0,
+                distanceKm = 0f,
+            )
 
             // wait for ID
             val routeId = routeRepository.insertRoute(newRoute)
             currentRoute.value = newRoute.copy(id = routeId)
 
             locationRepository.startRecording(routeId)
-            _isLocationServiceOn.value = true
+
+            sendActionToLocationService(LocationService.ACTION_START_RECORDING)
+            _isServiceRecordingRoute.value = true
             startTimer()
         }
     }
 
     private fun stopRecording(){
-        _isLocationServiceOn.value = false
+        sendActionToLocationService(LocationService.ACTION_STOP_RECORDING)
+        _isServiceRecordingRoute.value = false
         stopTimer()
         locationRepository.stopRecording()
     }
@@ -135,7 +189,12 @@ class MainViewModel @Inject constructor(
         //TODO remove print and temp
         println("route stopped")
         println(name)
-        routeRepository.updateRoute(currentRoute.value!!.copy(name = name, numberOfPoints = locationStats.value.numberOfPointsOnRoute))
+        routeRepository.updateRoute(currentRoute.value!!.copy(
+            name = name,
+            numberOfPoints = locationStats.value.numberOfPointsOnRoute,
+            duration = _elapsedTime.value,
+            distanceKm = locationStats.value.totalDistanceKm,
+        ))
     }
 
     // timer

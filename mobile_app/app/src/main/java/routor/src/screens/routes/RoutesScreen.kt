@@ -61,7 +61,7 @@ fun RoutesScreen(
                             fontSize = 20.sp
                         )
                         Text(
-                            text = "${route.time}",
+                            text = "${route.date}",
                             fontSize = 12.sp
                         )
                     }

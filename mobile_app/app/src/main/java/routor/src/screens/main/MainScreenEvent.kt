@@ -6,4 +6,5 @@ sealed interface MainScreenEvent {
     data object HideStopRouteDialog: MainScreenEvent
     data object CancelRoute: MainScreenEvent
     data class SaveRoute(val name: String): MainScreenEvent
+    data object CenterMapOnCurrentLocation: MainScreenEvent
 }

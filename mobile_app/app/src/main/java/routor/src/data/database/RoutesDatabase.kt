@@ -8,7 +8,7 @@ import routor.src.data.types.Route
 
 @Database(
     entities = [Route::class, Point::class],
-    version = 1
+    version = 3
 )
 @TypeConverters(
     Converters::class

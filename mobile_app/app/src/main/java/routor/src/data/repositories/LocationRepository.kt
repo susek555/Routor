@@ -6,11 +6,12 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import org.maplibre.android.geometry.LatLng
 import routor.src.data.types.Point
 import javax.inject.Inject
 import javax.inject.Singleton
-import routor.src.location.LocationStats
-import routor.src.utils.LocationHelper
+import routor.src.data.types.RouteStats
+import routor.src.utils.LocationStatsHelper
 
 @Singleton
 class LocationRepository @Inject constructor(
@@ -20,10 +21,13 @@ class LocationRepository @Inject constructor(
 
     private var currentRouteId: Long? = null
     private var recordingStartTime: Long? = null
+    private var points: List<LatLng> = emptyList()
     private var numberOfPointsOnRoute: Int = 0
 
-    private val _locationStatsFlow = MutableStateFlow(LocationStats())
-    val locationStatsFlow = _locationStatsFlow.asStateFlow()
+    private val _routeStatsFlow = MutableStateFlow(RouteStats())
+    val locationStatsFlow = _routeStatsFlow.asStateFlow()
+    private val _currentLocation = MutableStateFlow<LatLng?>(null)
+    val currentLocation = _currentLocation.asStateFlow()
 
     //recording control
     fun startRecording(routeId: Long) {
@@ -31,41 +35,52 @@ class LocationRepository @Inject constructor(
         recordingStartTime = System.currentTimeMillis()
         totalDistanceKilometers = 0f
         lastPoint = null
+        numberOfPointsOnRoute = 0
     }
 
     fun stopRecording() {
         currentRouteId = null
         recordingStartTime = null
-        numberOfPointsOnRoute = 0
-        _locationStatsFlow.value = LocationStats()
+        points = emptyList()
+        _routeStatsFlow.value = RouteStats()
     }
 
     private var totalDistanceKilometers: Float = 0f
     private var lastPoint: Triple<Double, Double, Long>? = null
 
     @Synchronized
+    fun handleSingleLocationUpdate(latitude: Double, longitude: Double) {
+        //TODO remove prints
+        println("point received")
+        println("lat: $latitude  lon: $longitude")
+        _currentLocation.value = LatLng(latitude, longitude)
+    }
+
+    @Synchronized
     fun handleLocationUpdate(latitude: Double, longitude: Double) {
+        _currentLocation.value = LatLng(latitude, longitude)
+        points += _currentLocation.value!!
         var distanceMeters: Float = 0f
         var speedKilometers: Float = 0f
         val currentTimeMillis = System.currentTimeMillis()
 
         lastPoint?.let { last ->
-            distanceMeters = LocationHelper.getDistanceMeters(
+            distanceMeters = LocationStatsHelper.getDistanceMeters(
                 last.first, last.second, latitude, longitude
             )
 
             // TODO check detect stop condition
-            if (distanceMeters < 1.0f) return
+            if (distanceMeters < 3.0f) return
 
-            speedKilometers = LocationHelper.calculateSpeedKilometers(
+            speedKilometers = LocationStatsHelper.calculateSpeedKilometers(
                 distanceMeters, currentTimeMillis - last.third
             )
             totalDistanceKilometers += distanceMeters / 1000f
         }
 
         numberOfPointsOnRoute += 1
-        val stats = LocationStats(latitude, longitude, speedKilometers, totalDistanceKilometers, numberOfPointsOnRoute)
-        _locationStatsFlow.value = stats
+        val stats = RouteStats(points, speedKilometers, totalDistanceKilometers, numberOfPointsOnRoute)
+        _routeStatsFlow.value = stats
 
         lastPoint = Triple(latitude, longitude, currentTimeMillis)
 

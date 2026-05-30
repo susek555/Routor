@@ -15,9 +15,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import routor.src.data.repositories.LocationRepository
 import javax.inject.Inject
 
@@ -40,8 +42,9 @@ class LocationService: Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when(intent?.action){
-            ACTION_START -> start()
-            ACTION_STOP -> stop()
+            ACTION_START_RECORDING -> start()
+            ACTION_STOP_RECORDING -> stop()
+            ACTION_GET_SINGLE_LOCATION -> getSingleLocation()
         }
         return super.onStartCommand(intent, flags, startId)
     }
@@ -56,6 +59,7 @@ class LocationService: Service() {
             .setContentText("Location: null")
             .setSmallIcon(R.drawable.ic_launcher_background)
             .setOngoing(true)
+            .setOnlyAlertOnce(true)
 
         val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
@@ -85,13 +89,25 @@ class LocationService: Service() {
         Toast.makeText(this, "Location updates stopped (inside service)", Toast.LENGTH_SHORT).show()
     }
 
+    private fun getSingleLocation() {
+        serviceScope.launch {
+            locationClient
+                .getLastLocation { location ->
+                    if (location != null) {
+                        repository.handleSingleLocationUpdate(location.latitude, location.longitude)
+                    }
+                }
+        }
+    }
+
     override fun onDestroy() {
         super.onDestroy()
         serviceScope.cancel()
     }
 
     companion object {
-        const val ACTION_START = "ACTION_START"
-        const val ACTION_STOP = "ACTION_STOP"
+        const val ACTION_START_RECORDING = "ACTION_START_RECORDING"
+        const val ACTION_STOP_RECORDING = "ACTION_STOP_RECORDING"
+        const val ACTION_GET_SINGLE_LOCATION = "ACTION_GET_SINGLE_LOCATION"
     }
 }

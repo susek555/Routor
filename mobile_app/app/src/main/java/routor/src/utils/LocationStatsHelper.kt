@@ -2,7 +2,7 @@ package routor.src.utils
 
 import android.location.Location.distanceBetween
 
-object LocationHelper {
+object LocationStatsHelper {
     fun getDistanceMeters(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Float {
         val results = FloatArray(1)
         distanceBetween(lat1, lon1, lat2, lon2, results)
