@@ -7,5 +7,5 @@
 .externalNativeBuild
 .cxx
 local.properties
-/.idea/
-/.kotlin/
+mobile_app/.idea/
+mobile_app/.kotlin/
