@@ -1,13 +1,9 @@
-from typing import Annotated
+from fastapi import FastAPI, HTTPException, Request
 
-from fastapi import Depends, FastAPI, HTTPException, Request
-from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncSession
-from src.database.database import get_db
+from src.database.database import get_dummies
 from src.generate_routes.task import dummy_task
 
 app = FastAPI(title="Routor API")
-DBDependency = Annotated[AsyncSession, Depends(get_db)]
 
 
 @app.get("/dummy")
@@ -16,11 +12,9 @@ def get_dummy():
 
 
 @app.get("/healthcheck-db")
-async def check_db_connection(db: DBDependency):
+async def check_db_connection():
     try:
-        result = await db.execute(text("SELECT * FROM dummy"))
-
-        rows = [dict(row) for row in result.mappings().all()]
+        rows = await get_dummies()
 
         return {
             "status": "ok",
