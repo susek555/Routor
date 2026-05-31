@@ -1,6 +1,5 @@
-networks:
-  db_network:
-    driver: bridge
+include:
+  - ../docker-compose.network.yaml
 
 volumes:
   db_data:
