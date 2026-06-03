@@ -67,8 +67,10 @@ dependencies {
     implementation(libs.ktor.client.content.negotiation)
     implementation(libs.ktor.serialization.kotlinx.json)
     implementation(libs.ktor.client.cio)
+    implementation(libs.ktor.client.okhttp)
     implementation(libs.ktor.logging)
     implementation(libs.ktor.ktorfit)
+    ksp(libs.ktor.ktorfit.compiler)
 
     implementation(libs.google.location)
     implementation(libs.serialization.json)

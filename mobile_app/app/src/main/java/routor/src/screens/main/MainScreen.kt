@@ -38,6 +38,7 @@ import routor.src.utils.formatTime
 @Composable
 fun MainScreen(
     displayRoutesScreen: () -> Unit,
+    displayGenerationsScreen: () -> Unit,
     viewModel: MainViewModel
 ) {
     val isServiceRecordingRoute by viewModel.isServiceRecordingRoute.collectAsState()
@@ -89,6 +90,17 @@ fun MainScreen(
                 update = {}
             )
             if (!isServiceRecordingRoute) {
+
+                //TODO rearrange to NavBar
+                Button(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .offset(x = (-20).dp, y = 40.dp),
+                    onClick = displayGenerationsScreen
+                ) {
+                    Text("Generate")
+                }
+
                 Button(
                     modifier = Modifier
                         .align(Alignment.TopEnd)

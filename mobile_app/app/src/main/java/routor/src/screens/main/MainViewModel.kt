@@ -43,6 +43,8 @@ class MainViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
 ) : ViewModel() {
 
+    // TODO detach class UI state
+
     val locationStats = locationRepository.locationStatsFlow
     val currentLocation = locationRepository.currentLocation
 
