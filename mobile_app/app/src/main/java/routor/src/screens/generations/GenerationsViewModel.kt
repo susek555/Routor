@@ -16,9 +16,21 @@ class GenerationsViewModel @Inject constructor(
     private val generationsRepository: GenerationsRepository,
     @ApplicationContext private val context: Context,
 ) : ViewModel() {
+    private val _notification = MutableStateFlow("Waiting for notifications...")
+    val notification = _notification.asStateFlow()
 
     private val _response = MutableStateFlow("Perform request...")
     val response = _response.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+
+            generationsRepository.listenToRouteUpdates()
+                .collect { notification ->
+                    _notification.value = notification.toString()
+                }
+        }
+    }
 
     fun onEvent(event: GenerationsEvent) {
         when (event) {

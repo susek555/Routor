@@ -11,6 +11,7 @@ import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.cache.HttpCache
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.defaultRequest
+import io.ktor.client.plugins.websocket.WebSockets
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
@@ -23,6 +24,10 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 object NetworkModule {
+    // TODO move it to config file
+    private const val BASE_URL = "citysearch-attendance-satisfy-rejected.trycloudflare.com"
+    private const val BASE_HTTPS_URL = "https://$BASE_URL/"
+    private const val BASE_WS_URL = "ws://$BASE_URL/ws/notifications"
 
     @Provides
     @Singleton
@@ -41,18 +46,26 @@ object NetworkModule {
                 requestTimeoutMillis = 3000
             }
             install(HttpCache)
+            install(WebSockets)
         }
     }
 
     @Provides
     @Singleton
     fun provideKtorfit(httpClient: HttpClient): Ktorfit {
-        val baseUrl = "https://citysearch-attendance-satisfy-rejected.trycloudflare.com/"
-
         return Ktorfit.Builder()
-            .baseUrl(baseUrl)
+            .baseUrl(BASE_HTTPS_URL)
             .httpClient(httpClient)
             .build()
+    }
+
+    @Provides
+    @Singleton
+    fun provideWebSocketService(): WebSocketService {
+        return WebSocketService(
+            httpClient = provideHttpClient(),
+            BASE_WS_URL = BASE_WS_URL
+        )
     }
 
     @Provides

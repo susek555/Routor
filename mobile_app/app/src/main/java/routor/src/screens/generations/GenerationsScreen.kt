@@ -18,6 +18,7 @@ fun GenerateScreen(
     viewModel: GenerationsViewModel
 ) {
     val response = viewModel.response.collectAsState()
+    val notification = viewModel.notification.collectAsState()
 
     Scaffold(
         floatingActionButton = {
@@ -42,6 +43,11 @@ fun GenerateScreen(
 
             Text(
                 text = response.value
+            )
+
+
+            Text(
+                text = notification.value
             )
         }
     }

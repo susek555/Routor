@@ -56,10 +56,11 @@ ktor-client-cio = { module = "io.ktor:ktor-client-cio", version.ref = "ktor" }
 ktor-client-content-negotiation = { module = "io.ktor:ktor-client-content-negotiation", version.ref = "ktor" }
 ktor-client-core = { module = "io.ktor:ktor-client-core", version.ref = "ktor" }
 ktor-client-okhttp = { module = "io.ktor:ktor-client-okhttp", version.ref = "ktor" }
+ktor-client-websockets = { module = "io.ktor:ktor-client-websockets", version.ref = "ktor" }
 ktor-serialization-kotlinx-json = { module = "io.ktor:ktor-serialization-kotlinx-json", version.ref = "ktor" }
 ktor-logging = { group = "io.ktor", name = "ktor-client-logging", version.ref = "ktor"}
 ktor-ktorfit = { group = "de.jensklingenberg.ktorfit", name = "ktorfit-lib", version.ref = "ktorfit"}
-ktor-ktorfit-compiler = { group = "de.jensklingenberg.ktorfit", name = "ktorfit-ksp", version.ref = "ktorfit"}
+ktor-ktorfit-ksp = { group = "de.jensklingenberg.ktorfit", name = "ktorfit-ksp", version.ref = "ktorfit"}
 kotlinx-metadata-jvm = { group = "org.jetbrains.kotlinx", name = "kotlinx-metadata-jvm", version.ref = "kotlinx-metadata"}
 maplibre = { group = "org.maplibre.gl", name = "android-sdk", version.ref = "maplibre"}
 
