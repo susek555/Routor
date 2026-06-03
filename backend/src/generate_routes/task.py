@@ -1,8 +1,11 @@
 import asyncio
+import json
 import time
 
+import redis
+
 from src.database.database import get_single_dummy_message
-from src.generate_routes.worker_app import celery_app
+from src.generate_routes.worker_app import celery_app, redis_url
 
 
 @celery_app.task(name="generate_routes.dummy_task")
@@ -17,6 +20,17 @@ def dummy_task(ip: str, dummy_message: str):
     except Exception as e:
         print(f"CRITICAL ERROR: Failed to communicate with DB inside Celery: {str(e)}")
         raise e
+
+    r = redis.Redis.from_url(redis_url)
+    payload = {
+        "event": "DUMMY_TASK_PERFORMED",
+        "status": "success",
+        "user_ip": ip,
+        "message": "Message from worker through redis websocket.",
+    }
+
+    print("Publishing notification to Redis channel...")
+    r.publish("global_notifications", json.dumps(payload))
 
     print("Task finished!")
     return {
