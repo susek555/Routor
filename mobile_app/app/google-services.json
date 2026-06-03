@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "291363964349",
+    "project_id": "routor-7b5a3",
+    "storage_bucket": "routor-7b5a3.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:291363964349:android:6a0df787cee2313bfbfed4",
+        "android_client_info": {
+          "package_name": "com.example.routor"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDAiHvJWOqo1qdhlgrlQfwmN0Vg91X0EF8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -20,7 +20,17 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Routor"
         tools:targetApi="31">
-        <service android:name="routor.src.location.LocationService" android:foregroundServiceType="location"/>
+        <service
+            android:name="routor.src.location.LocationService"
+            android:foregroundServiceType="location"
+            />
+        <service
+            android:name=".src.notifications.MyFirebaseMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
         <activity
             android:name="routor.MainActivity"
             android:exported="true"

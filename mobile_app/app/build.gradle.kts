@@ -6,6 +6,7 @@ plugins {
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt)
     alias(libs.plugins.ktorfit)
+    alias(libs.plugins.google)
 }
 
 android {
@@ -89,4 +90,10 @@ dependencies {
     ksp(libs.hilt.compiler)
 
     implementation(libs.maplibre)
+
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.analytics)
+    implementation(libs.firebase.messaging.ktx)
+
+    implementation(libs.kotlinx.coroutines.play.services)
 }

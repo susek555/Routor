@@ -1,5 +1,6 @@
 package routor.src.network.api
 
+import de.jensklingenberg.ktorfit.http.Body
 import de.jensklingenberg.ktorfit.http.POST
 import kotlinx.serialization.Serializable
 
@@ -10,8 +11,13 @@ data class TaskResponse(
     val task_id : String
 )
 
+@Serializable
+data class TaskPayload(
+    val fcm_token: String
+)
+
 interface DummyApi {
 
     @POST("dummy-task")
-    suspend fun triggerDummyTask() : TaskResponse
+    suspend fun triggerDummyTask(@Body payload: TaskPayload) : TaskResponse
 }
