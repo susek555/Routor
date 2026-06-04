@@ -4,6 +4,7 @@ import os
 
 import redis.asyncio as aioredis
 from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
+from pydantic import BaseModel
 
 from src.database.database import get_dummies
 from src.generate_routes.task import dummy_task
@@ -34,10 +35,14 @@ async def check_db_connection():
             status_code=500, detail=f"Error connecting to database: {str(e)}"
         ) from e
 
+class TaskPayload(BaseModel):
+    fcm_token: str
 
 @app.post("/dummy-task")
-async def dummy_task_endpoint(request: Request):
-    task = dummy_task.delay(request.client.host, "Message from api.")
+async def dummy_task_endpoint(payload: TaskPayload, request: Request):
+    task = dummy_task.delay(
+        payload.fcm_token, request.client.host, "Message from api."
+    )
 
     return {
         "status": "Accepted",

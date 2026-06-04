@@ -5,11 +5,12 @@ import time
 import redis
 
 from src.database.database import get_single_dummy_message
+from src.firebase_notification import send_push_notification
 from src.generate_routes.worker_app import celery_app, redis_url
 
 
 @celery_app.task(name="generate_routes.dummy_task")
-def dummy_task(ip: str, dummy_message: str):
+def dummy_task(fcm_token: str, ip: str, dummy_message: str):
     print(f"Starting heavy task for user {ip}...")
     time.sleep(10)
 
@@ -29,8 +30,14 @@ def dummy_task(ip: str, dummy_message: str):
         "message": "Message from worker through redis websocket.",
     }
 
+    # REDIS
     print("Publishing notification to Redis channel...")
     r.publish("global_notifications", json.dumps(payload))
+
+    # GOOGLE FIREBASE
+    send_push_notification(
+        fcm_token, "Task has been finished", "Messege through google firebase"
+    )
 
     print("Task finished!")
     return {
