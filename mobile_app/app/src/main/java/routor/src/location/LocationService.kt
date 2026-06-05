@@ -14,12 +14,14 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import routor.src.data.repositories.LocationRepository
+import routor.src.notifications.RouteFollowerNotificator
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -27,9 +29,13 @@ class LocationService: Service() {
 
     @Inject lateinit var repository: LocationRepository
     @Inject lateinit var locationClient: LocationClient
+    @Inject lateinit var notificator: RouteFollowerNotificator
 
     private var serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val binder = LocationBinder()
+
+    private var duration = 0L
+
 
     inner class LocationBinder: Binder() {
         fun getService(): LocationService = this@LocationService
@@ -53,31 +59,28 @@ class LocationService: Service() {
             serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         }
 
-        val notification = NotificationCompat.Builder(this, "routor")
-            .setContentTitle("Tracking route...")
-            .setContentText("Location: null")
-            .setSmallIcon(R.drawable.ic_launcher_background)
-            .setOngoing(true)
-            .setOnlyAlertOnce(true)
-
-        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-
         locationClient
             .getLocationUpdates(2500L)
             .catch {e -> e.printStackTrace() }
             .onEach { location ->
-                val latitude = location.latitude.toString()
-                val longitude = location.longitude.toString()
-                val updatedNotification = notification
-                    .setContentText("Location: $latitude, $longitude")
-                notificationManager.notify(1, updatedNotification.build())
-
                 repository.handleLocationUpdate(location.latitude, location.longitude)
             }
             .launchIn(serviceScope)
-        startForeground(1, notification.build())
 
-        Toast.makeText(this, "Location updates started (inside service)", Toast.LENGTH_SHORT).show()
+        //timer
+        serviceScope.launch {
+            while (isActive) {
+                delay(1000)
+                duration++
+
+                repository.updateDuration(duration)
+
+                val currentStats = repository.locationStatsFlow.value
+                notificator.update(currentStats, duration)
+            }
+        }
+
+//        Toast.makeText(this, "Location updates started (inside service)", Toast.LENGTH_SHORT).show()
     }
 
     private fun stop() {
@@ -85,7 +88,7 @@ class LocationService: Service() {
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
 
-        Toast.makeText(this, "Location updates stopped (inside service)", Toast.LENGTH_SHORT).show()
+//        Toast.makeText(this, "Location updates stopped (inside service)", Toast.LENGTH_SHORT).show()
     }
 
     private fun getSingleLocation() {

@@ -28,6 +28,12 @@ class LocationRepository @Inject constructor(
     val locationStatsFlow = _routeStatsFlow.asStateFlow()
     private val _currentLocation = MutableStateFlow<LatLng?>(null)
     val currentLocation = _currentLocation.asStateFlow()
+    private val _duration = MutableStateFlow(0L)
+    val duration = _duration.asStateFlow()
+
+    fun updateDuration(seconds: Long) {
+        _duration.value = seconds
+    }
 
     //recording control
     fun startRecording(routeId: Long) {

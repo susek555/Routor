@@ -34,6 +34,7 @@ import routor.src.data.repositories.LocationRepository
 import routor.src.data.repositories.RouteRepository
 import routor.src.data.types.Route
 import routor.src.location.LocationService
+import routor.src.notifications.RouteFollowerNotificator
 import javax.inject.Inject
 
 @HiltViewModel
@@ -47,6 +48,7 @@ class MainViewModel @Inject constructor(
     // TODO detach class UI state
 
     val locationStats = locationRepository.locationStatsFlow
+    val duration = locationRepository.duration
     val currentLocation = locationRepository.currentLocation
 
     private val _isServiceRecordingRoute = MutableStateFlow(false)
@@ -71,6 +73,8 @@ class MainViewModel @Inject constructor(
     val centerMapEvent = _centerMapEvent.asSharedFlow()
 
      init {
+
+         // center map on user location
          viewModelScope.launch {
              if (!_isServiceRecordingRoute.value){
                  sendActionToLocationService(LocationService.ACTION_GET_SINGLE_LOCATION)
@@ -172,14 +176,12 @@ class MainViewModel @Inject constructor(
 
             sendActionToLocationService(LocationService.ACTION_START_RECORDING)
             _isServiceRecordingRoute.value = true
-            startTimer()
         }
     }
 
     private fun stopRecording(){
         sendActionToLocationService(LocationService.ACTION_STOP_RECORDING)
         _isServiceRecordingRoute.value = false
-        stopTimer()
         locationRepository.stopRecording()
     }
 
@@ -195,33 +197,8 @@ class MainViewModel @Inject constructor(
         routeRepository.updateRoute(currentRoute.value!!.copy(
             name = name,
             numberOfPoints = locationStats.value.numberOfPointsOnRoute,
-            duration = _elapsedTime.value,
+            duration = duration.value,
             distanceKm = locationStats.value.totalDistanceKm,
         ))
-    }
-
-    // timer
-    private var startTimestamp: Long = 0L
-    private val _elapsedTime = MutableStateFlow<Long>(0)
-    val elapsedTime: StateFlow<Long> get() = _elapsedTime
-
-    private var timerJob: Job? = null
-
-    private fun startTimer() {
-        startTimestamp = SystemClock.elapsedRealtime()
-
-        timerJob?.cancel()
-        timerJob = viewModelScope.launch {
-            while (isActive) {
-                _elapsedTime.value = SystemClock.elapsedRealtime() - startTimestamp
-                delay(1000)
-            }
-        }
-    }
-
-    private fun stopTimer() {
-        timerJob?.cancel()
-        timerJob = null
-        _elapsedTime.value = 0
     }
 }

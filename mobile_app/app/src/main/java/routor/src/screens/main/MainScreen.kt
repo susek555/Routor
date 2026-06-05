@@ -30,6 +30,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import routor.src.dialogFactory.confirmDialog.ConfirmDialog
 import routor.src.data.types.RouteStats
 import routor.src.utils.MapHelper
@@ -41,12 +42,12 @@ fun MainScreen(
     displayGenerationsScreen: () -> Unit,
     viewModel: MainViewModel
 ) {
-    val isServiceRecordingRoute by viewModel.isServiceRecordingRoute.collectAsState()
-    val stopRouteDialogState by viewModel.stopRouteDialogState.collectAsState()
+    val isServiceRecordingRoute by viewModel.isServiceRecordingRoute.collectAsStateWithLifecycle()
+    val stopRouteDialogState by viewModel.stopRouteDialogState.collectAsStateWithLifecycle()
 
-    val currentLocation by viewModel.currentLocation.collectAsState()
-    val routeStats by viewModel.locationStats.collectAsState(initial = RouteStats())
-    val duration by viewModel.elapsedTime.collectAsState()
+    val currentLocation by viewModel.currentLocation.collectAsStateWithLifecycle()
+    val routeStats by viewModel.locationStats.collectAsStateWithLifecycle()
+    val duration by viewModel.duration.collectAsStateWithLifecycle()
 
     //map
     val context = LocalContext.current
