@@ -15,7 +15,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.catch
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.isActive
@@ -92,7 +91,7 @@ class LocationService: Service() {
     private fun getSingleLocation() {
         serviceScope.launch {
             locationClient
-                .getLastLocation { location ->
+                .getFreshLocation { location ->
                     if (location != null) {
                         repository.handleSingleLocationUpdate(location.latitude, location.longitude)
                     }

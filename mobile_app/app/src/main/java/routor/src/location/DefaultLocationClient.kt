@@ -24,7 +24,6 @@ class DefaultLocationClient(
     private val context: Context,
     private val client: FusedLocationProviderClient
 ) : LocationClient {
-        private var cancellationTokenSource = CancellationTokenSource()
 
     private fun isLocationEnabled(): Boolean {
         val locationManager: LocationManager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
@@ -86,15 +85,17 @@ class DefaultLocationClient(
     //TODO fix permissions checking
 
     @SuppressLint("MissingPermission")
-    override fun getLastLocation(onLocation: (Location?) -> Unit) {
+    override fun getFreshLocation(onLocation: (Location?) -> Unit) {
         if (!checkPermissions()) {
             onLocation(null)
             return
         }
 
+        val cancellationToken = CancellationTokenSource()
+
         client.getCurrentLocation(
             Priority.PRIORITY_HIGH_ACCURACY,
-            cancellationTokenSource.token
+            cancellationToken.token
         )
             .addOnSuccessListener { location ->
                 onLocation(location)

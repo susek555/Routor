@@ -15,7 +15,6 @@ import org.maplibre.android.WellKnownTileServer
 import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.maps.MapView
-import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.Style
 import org.maplibre.android.style.layers.Property
 import org.maplibre.android.style.layers.PropertyFactory
@@ -172,27 +171,34 @@ object MapHelper {
         }
     }
 
-    fun centerCameraOnUserLocation(mapView: MapView, latLng: LatLng) {
+
+
+    fun centerCameraOnUserLocation(mapView: MapView, userLocation: LatLng) {
         mapView.getMapAsync { map ->
-            val style = map.style ?: return@getMapAsync
-            val source = style.getSourceAs<GeoJsonSource>(USER_SOURCE_ID) ?: return@getMapAsync
-
-            val point = Point.fromLngLat(latLng.longitude, latLng.latitude)
-            source.setGeoJson(Feature.fromGeometry(point))
-
-            val cameraUpdate = CameraUpdateFactory.newLatLngZoom(latLng, 15.0)
+            val cameraUpdate = CameraUpdateFactory.newLatLngZoom(userLocation, 15.0)
             map.animateCamera(cameraUpdate, 1000)
         }
     }
 
-    private fun animateRouteUpdate(style: Style, oldAnimator: ValueAnimator?, latLng: LatLng)  : ValueAnimator? {
+    fun updateUserLocation(mapView: MapView, newLocation: LatLng) {
+        mapView.getMapAsync { map ->
+            val style = map.style ?: return@getMapAsync
+
+            // animation
+            val oldAnimator = mapView.getTag(R.id.map_animator_tag) as? ValueAnimator
+            val newAnimator = animateUserLocationChange(style, oldAnimator, newLocation)
+            mapView.setTag(R.id.map_animator_tag, newAnimator)
+        }
+    }
+
+    private fun animateUserLocationChange(style: Style, oldAnimator: ValueAnimator?, destPoint: LatLng)  : ValueAnimator? {
         val source = style.getSourceAs<GeoJsonSource>(USER_SOURCE_ID) ?: return null
 
         val lastFeature = source.querySourceFeatures(null).firstOrNull()
         val lastPoint = lastFeature?.geometry() as? Point
 
         if (lastPoint == null){
-            val point = Point.fromLngLat(latLng.longitude, latLng.latitude)
+            val point = Point.fromLngLat(destPoint.longitude, destPoint.latitude)
             source.setGeoJson(Feature.fromGeometry(point))
             return null
         }
@@ -206,8 +212,8 @@ object MapHelper {
             addUpdateListener { animation  ->
                 val fraction = animation.animatedValue as Float
 
-                val lon = lastPoint.longitude() + (latLng.longitude - lastPoint.longitude()) * fraction
-                val lat = lastPoint.latitude() + (latLng.latitude - lastPoint.latitude()) * fraction
+                val lon = lastPoint.longitude() + (destPoint.longitude - lastPoint.longitude()) * fraction
+                val lat = lastPoint.latitude() + (destPoint.latitude - lastPoint.latitude()) * fraction
 
                 val intermediatePoint = Point.fromLngLat(lon, lat)
                 source.setGeoJson(Feature.fromGeometry(intermediatePoint))
@@ -243,7 +249,7 @@ object MapHelper {
 
             //animations
             val oldAnimator = mapView.getTag(R.id.map_animator_tag) as? ValueAnimator
-            val newAnimator = animateRouteUpdate(style, oldAnimator, points.last())
+            val newAnimator = animateUserLocationChange(style, oldAnimator, points.last())
             mapView.setTag(R.id.map_animator_tag, newAnimator)
         }
     }

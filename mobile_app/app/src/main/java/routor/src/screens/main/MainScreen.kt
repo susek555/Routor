@@ -57,10 +57,15 @@ fun MainScreen(
 
     //map centered on location
     LaunchedEffect(Unit) {
-        viewModel.centerMapEvent.collect {
-            currentLocation?.let { loc ->
-                MapHelper.centerCameraOnUserLocation(mapView, loc)
-            }
+        viewModel.centerMapEvent.collect { location ->
+            MapHelper.centerCameraOnUserLocation(mapView, location)
+        }
+    }
+
+    // update user location
+    LaunchedEffect(currentLocation) {
+        if (currentLocation != null) {
+            MapHelper.updateUserLocation(mapView, currentLocation!!)
         }
     }
 

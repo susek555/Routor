@@ -29,6 +29,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.datetime.Clock
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
+import org.maplibre.android.geometry.LatLng
 import routor.src.data.repositories.LocationRepository
 import routor.src.data.repositories.RouteRepository
 import routor.src.data.types.Route
@@ -66,15 +67,17 @@ class MainViewModel @Inject constructor(
     val stopRouteDialogState = combine(_isStopRouteDialogOpen, _stopRouteDialogConfig) {isVisible, config ->
         ConfirmDialogState(isVisible, config)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), ConfirmDialogState(false, null))
-    private val _centerMapEvent = MutableSharedFlow<Unit>(replay = 0)
+    private val _centerMapEvent = MutableSharedFlow<LatLng>(replay = 0)
     val centerMapEvent = _centerMapEvent.asSharedFlow()
 
      init {
          viewModelScope.launch {
              if (!_isServiceRecordingRoute.value){
                  sendActionToLocationService(LocationService.ACTION_GET_SINGLE_LOCATION)
-                 delay(1000)
-                 _centerMapEvent.emit(Unit)
+
+                 // wait for location to appear
+                 currentLocation.first { it != null }
+                 _centerMapEvent.emit(currentLocation.value!!)
              }
          }
     }
@@ -109,14 +112,12 @@ class MainViewModel @Inject constructor(
             }
             MainScreenEvent.CenterMapOnCurrentLocation -> {
                 if (!_isServiceRecordingRoute.value){
-                    val oldLocation = currentLocation.value
-                    sendActionToLocationService(LocationService.ACTION_GET_SINGLE_LOCATION)
-                    viewModelScope.launch {
-                        currentLocation.first { it != oldLocation}
-                        _centerMapEvent.emit(Unit)
+                    currentLocation.value?.let {
+                        viewModelScope.launch { _centerMapEvent.emit(currentLocation.value!!) }
                     }
+                    sendActionToLocationService(LocationService.ACTION_GET_SINGLE_LOCATION)
                 } else {
-                    viewModelScope.launch { _centerMapEvent.emit(Unit) }
+                    viewModelScope.launch { _centerMapEvent.emit(currentLocation.value!!) }
                 }
             }
         }
