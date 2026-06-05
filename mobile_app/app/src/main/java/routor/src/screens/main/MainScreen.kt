@@ -62,17 +62,16 @@ fun MainScreen(
         }
     }
 
-    // update user location
-    LaunchedEffect(currentLocation) {
-        if (currentLocation != null) {
-            MapHelper.updateUserLocation(mapView, currentLocation!!)
-        }
-    }
-
-    //follow route
-    LaunchedEffect(routeStats.points) {
-        if(isServiceRecordingRoute){
-            MapHelper.updateRoute(mapView, routeStats.points)
+    // animate route and user location
+     LaunchedEffect(currentLocation, routeStats.points, isServiceRecordingRoute) {
+        if (isServiceRecordingRoute) {
+            if (routeStats.points.isNotEmpty()) {
+                MapHelper.updateRoute(mapView, routeStats.points)
+            }
+        } else {
+            if (currentLocation != null) {
+                MapHelper.updateUserLocation(mapView, currentLocation!!)
+            }
         }
     }
 

@@ -183,40 +183,53 @@ object MapHelper {
     fun updateUserLocation(mapView: MapView, newLocation: LatLng) {
         mapView.getMapAsync { map ->
             val style = map.style ?: return@getMapAsync
+            val userSource = style.getSourceAs<GeoJsonSource>(USER_SOURCE_ID) ?: return@getMapAsync
 
             // animation
             val oldAnimator = mapView.getTag(R.id.map_animator_tag) as? ValueAnimator
-            val newAnimator = animateUserLocationChange(style, oldAnimator, newLocation)
+            val newAnimator = animateLocation(userSource, oldAnimator, newLocation)
             mapView.setTag(R.id.map_animator_tag, newAnimator)
         }
     }
 
-    private fun animateUserLocationChange(style: Style, oldAnimator: ValueAnimator?, destPoint: LatLng)  : ValueAnimator? {
-        val source = style.getSourceAs<GeoJsonSource>(USER_SOURCE_ID) ?: return null
+    private fun animateLocation(
+        userSource: GeoJsonSource,
+        oldAnimator: ValueAnimator?,
+        destPoint: LatLng,
+        routeSource: GeoJsonSource? = null,
+        previousRoutePoints: List<Point> = emptyList()
+    ): ValueAnimator? {
 
-        val lastFeature = source.querySourceFeatures(null).firstOrNull()
+        val lastFeature = userSource.querySourceFeatures(null).firstOrNull()
         val lastPoint = lastFeature?.geometry() as? Point
 
-        if (lastPoint == null){
+        if (lastPoint == null) {
             val point = Point.fromLngLat(destPoint.longitude, destPoint.latitude)
-            source.setGeoJson(Feature.fromGeometry(point))
+            userSource.setGeoJson(Feature.fromGeometry(point))
             return null
         }
 
         oldAnimator?.cancel()
 
-        val newAnimator = ValueAnimator.ofFloat(0f, 1f).apply{
+        val newAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
             duration = 1000
             interpolator = LinearInterpolator()
 
-            addUpdateListener { animation  ->
+            addUpdateListener { animation ->
                 val fraction = animation.animatedValue as Float
 
                 val lon = lastPoint.longitude() + (destPoint.longitude - lastPoint.longitude()) * fraction
                 val lat = lastPoint.latitude() + (destPoint.latitude - lastPoint.latitude()) * fraction
-
                 val intermediatePoint = Point.fromLngLat(lon, lat)
-                source.setGeoJson(Feature.fromGeometry(intermediatePoint))
+
+                // Animate dot always
+                userSource.setGeoJson(Feature.fromGeometry(intermediatePoint))
+
+                // Route only if source passed
+                if (routeSource != null) {
+                    val updatedRoute = previousRoutePoints + intermediatePoint
+                    routeSource.setGeoJson(Feature.fromGeometry(LineString.fromLngLats(updatedRoute)))
+                }
             }
             start()
         }
@@ -228,29 +241,33 @@ object MapHelper {
             val style = map.style ?: return@getMapAsync
             val routeSource = style.getSourceAs<GeoJsonSource>(ROUTE_SOURCE_ID) ?: return@getMapAsync
             val startSource = style.getSourceAs<GeoJsonSource>(START_SOURCE_ID) ?: return@getMapAsync
+            val userSource = style.getSourceAs<GeoJsonSource>(USER_SOURCE_ID) ?: return@getMapAsync
 
             if (points.isEmpty()) {
                 clearRoute(mapView)
                 return@getMapAsync
             }
 
-            // start point
+            // start green point
             val firstPoint = Point.fromLngLat(points.first().longitude, points.first().latitude)
             startSource.setGeoJson(Feature.fromGeometry(firstPoint))
 
-            // route line
-//            if (points.size >= 3) {
-//                val routePoints = points.dropLast(1).map { Point.fromLngLat(it.longitude, it.latitude) }
             if (points.size >= 2) {
-                val routePoints = points.map { Point.fromLngLat(it.longitude, it.latitude) }
-                val lineString = LineString.fromLngLats(routePoints)
-                routeSource.setGeoJson(Feature.fromGeometry(lineString))
-            }
+                // all previous points on route
+                val mapboxPoints = points.map { Point.fromLngLat(it.longitude, it.latitude) }
+                val previousPoints = mapboxPoints.dropLast(1)
 
-            //animations
-            val oldAnimator = mapView.getTag(R.id.map_animator_tag) as? ValueAnimator
-            val newAnimator = animateUserLocationChange(style, oldAnimator, points.last())
-            mapView.setTag(R.id.map_animator_tag, newAnimator)
+                // animation
+                val oldAnimator = mapView.getTag(R.id.map_animator_tag) as? ValueAnimator
+                val newAnimator = animateLocation(
+                    userSource = userSource,
+                    oldAnimator = oldAnimator,
+                    destPoint = points.last(),
+                    routeSource = routeSource,
+                    previousRoutePoints = previousPoints
+                )
+                mapView.setTag(R.id.map_animator_tag, newAnimator)
+            }
         }
     }
 
