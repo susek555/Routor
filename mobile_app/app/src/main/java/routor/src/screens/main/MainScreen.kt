@@ -56,7 +56,7 @@ fun MainScreen(
     }
     MapHelper.SetupMapLifecycleEvents(mapView)
 
-    //map centered on location
+    //map center on request
     LaunchedEffect(Unit) {
         viewModel.centerMapEvent.collect { location ->
             MapHelper.centerCameraOnUserLocation(mapView, location)

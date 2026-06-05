@@ -2,7 +2,6 @@ package routor.src.screens.main
 
 import android.content.Context
 import android.content.Intent
-import android.os.SystemClock
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
@@ -13,11 +12,8 @@ import routor.src.dialogFactory.confirmDialog.ConfirmDialogConfigState
 import routor.src.dialogFactory.confirmDialog.ConfirmDialogState
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.asSharedFlow
@@ -25,7 +21,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.isActive
 import kotlinx.datetime.Clock
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
@@ -34,7 +29,6 @@ import routor.src.data.repositories.LocationRepository
 import routor.src.data.repositories.RouteRepository
 import routor.src.data.types.Route
 import routor.src.location.LocationService
-import routor.src.notifications.RouteFollowerNotificator
 import javax.inject.Inject
 
 @HiltViewModel
@@ -54,9 +48,9 @@ class MainViewModel @Inject constructor(
     private val _isServiceRecordingRoute = MutableStateFlow(false)
     val isServiceRecordingRoute = _isServiceRecordingRoute.asStateFlow()
 
-    private var currentRoute: MutableState<Route?> = mutableStateOf(null)
+    private var currentRoute: MutableStateFlow<Route?> = MutableStateFlow(null)
 
-    private val minimumNumberOfPoints = 10
+    private val MINIMUM_NUMBER_OF_POINTS = 10
 
     private val _isStopRouteDialogOpen = MutableStateFlow(false)
     private val _stopRouteDialogConfig = MutableStateFlow<ConfirmDialogConfig?>(
@@ -115,13 +109,11 @@ class MainViewModel @Inject constructor(
                 }
             }
             MainScreenEvent.CenterMapOnCurrentLocation -> {
-                if (!_isServiceRecordingRoute.value){
-                    currentLocation.value?.let {
-                        viewModelScope.launch { _centerMapEvent.emit(currentLocation.value!!) }
-                    }
-                    sendActionToLocationService(LocationService.ACTION_GET_SINGLE_LOCATION)
-                } else {
+                currentLocation.value?.let {
                     viewModelScope.launch { _centerMapEvent.emit(currentLocation.value!!) }
+                    if (!_isServiceRecordingRoute.value){
+                        sendActionToLocationService(LocationService.ACTION_GET_SINGLE_LOCATION)
+                    }
                 }
             }
         }
@@ -137,7 +129,7 @@ class MainViewModel @Inject constructor(
 
     //dialog
     private fun setDialogConfig() {
-        if(locationStats.value.numberOfPointsOnRoute < minimumNumberOfPoints){
+        if(locationStats.value.numberOfPointsOnRoute < MINIMUM_NUMBER_OF_POINTS){
             _stopRouteDialogConfig.value = dialogFactory.create(
                 ConfirmDialogConfigState.RouteNotLongEnough,
                 onConfirm = { onEvent(MainScreenEvent.CancelRoute)},
