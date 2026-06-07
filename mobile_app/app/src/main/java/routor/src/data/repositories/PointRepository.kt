@@ -14,4 +14,8 @@ class PointRepository @Inject constructor(
         println("route : point added")
         pointsDao.upsertPoint(point)
     }
+
+    suspend fun getPointsForRoute(routeId: Long) : List<Point> {
+        return pointsDao.getPointsForRoute(routeId)
+    }
 }

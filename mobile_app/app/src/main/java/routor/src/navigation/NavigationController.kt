@@ -1,16 +1,18 @@
 package routor.src.navigation
 
 import androidx.compose.runtime.Composable
-import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import routor.src.screens.generations.GenerationsViewModel
-import routor.src.screens.generations.GenerateScreen
-import routor.src.screens.main.MainScreen
-import routor.src.screens.main.MainViewModel
-import routor.src.screens.routes.RoutesScreen
-import routor.src.screens.routes.RoutesViewModel
+import routor.src.navigation.screens.GenerationsNavRoute
+import routor.src.navigation.screens.MainNavRoute
+import routor.src.navigation.screens.RoutesNavRoute
+import routor.src.navigation.screens.generationsScreen
+import routor.src.navigation.screens.mainScreen
+import routor.src.navigation.screens.navigateToGenerations
+import routor.src.navigation.screens.navigateToRouteDetails
+import routor.src.navigation.screens.navigateToRoutes
+import routor.src.navigation.screens.routeDetailsScreen
+import routor.src.navigation.screens.routesScreen
 
 @Composable
 fun NavigationController() {
@@ -18,36 +20,24 @@ fun NavigationController() {
 
     NavHost(
         navController = navController,
-        startDestination = "MainScreen"
-    ){
-        composable("MainScreen") { backStackEntry ->
-            MainScreen(
-                viewModel = hiltViewModel<MainViewModel>(backStackEntry),
-                displayRoutesScreen = {
-                    navController.navigate("RoutesScreen")
-                },
-                displayGenerationsScreen = {
-                    navController.navigate("GenerationsScreen")
-                }
-            )
-        }
+        startDestination = MainNavRoute
+    ) {
+        mainScreen(
+            onNavigateToRoutes = { navController.navigateToRoutes() },
+            onNavigateToGenerations = { navController.navigateToGenerations() }
+        )
 
-        composable("RoutesScreen") { backStackEntry ->
-            RoutesScreen(
-                viewModel = hiltViewModel<RoutesViewModel>(backStackEntry),
-                displayMainScreen = {
-                    navController.navigateUp()
-                }
-            )
-        }
+        routesScreen(
+            onNavigateToMain = { navController.navigateUp() },
+            onNavigateToRouteDetails = { id: Long -> navController.navigateToRouteDetails(id) }
+        )
 
-        composable("GenerationsScreen") { backStackEntry ->
-            GenerateScreen(
-                viewModel = hiltViewModel<GenerationsViewModel>(backStackEntry),
-                displayMainScreen = {
-                    navController.navigateUp()
-                }
-            )
-        }
+        routeDetailsScreen(
+            onNavigateBack = { navController.navigateUp() }
+        )
+
+        generationsScreen(
+            onNavigateToMain = { navController.navigateUp() }
+        )
     }
 }

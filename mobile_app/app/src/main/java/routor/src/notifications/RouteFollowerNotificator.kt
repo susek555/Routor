@@ -18,6 +18,8 @@ class RouteFollowerNotificator @Inject constructor(
     private val NOTIFICATION_ID = 1
     private val CHANNEL_ID = "routor"
 
+    // TODO make it prettier
+
     private val notificationBuilder = NotificationCompat.Builder(appContext, CHANNEL_ID)
         .setContentTitle("Tracking route...")
         .setContentText("Stats: null")

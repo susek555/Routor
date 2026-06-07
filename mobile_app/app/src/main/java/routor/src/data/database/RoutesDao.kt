@@ -5,6 +5,7 @@ import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.Query
 import androidx.room.Update
+import kotlinx.coroutines.flow.Flow
 import routor.src.data.types.Route
 
 @Dao
@@ -17,6 +18,9 @@ interface RoutesDao {
 
     @Delete
     suspend fun deleteRoute(route: Route)
+
+    @Query("SELECT * FROM routes WHERE id = :routeId")
+    fun getRoute(routeId: Long) : Flow<Route?>
 
     @Query("SELECT * FROM routes ORDER BY id ASC")
     suspend fun getAllRoutes() : List<Route>

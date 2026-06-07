@@ -25,7 +25,7 @@ import javax.inject.Singleton
 @InstallIn(SingletonComponent::class)
 object NetworkModule {
     // TODO move it to config file
-    private const val BASE_URL = "agency-authorization-searching-parallel.trycloudflare.com"
+    private const val BASE_URL = "sand-mountain-jon-equations.trycloudflare.com"
     private const val BASE_HTTPS_URL = "https://$BASE_URL/"
     private const val BASE_WS_URL = "ws://$BASE_URL/ws/notifications"
 

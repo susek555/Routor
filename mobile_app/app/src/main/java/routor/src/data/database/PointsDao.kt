@@ -12,5 +12,5 @@ interface PointsDao {
     suspend fun upsertPoint(point: Point)
 
     @Query("SELECT * FROM points WHERE routeId = :selectedRoute")
-    fun getPointsForRoute(selectedRoute: Long): Flow<List<Point>>
+    fun getPointsForRoute(selectedRoute: Long): List<Point>
 }

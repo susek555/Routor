@@ -87,6 +87,7 @@ dependencies {
 
     implementation(libs.hilt)
     implementation(libs.hilt.navigation)
+    implementation(libs.androidx.navigation)
     ksp(libs.hilt.compiler)
 
     implementation(libs.maplibre)

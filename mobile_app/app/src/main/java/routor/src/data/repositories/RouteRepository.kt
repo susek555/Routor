@@ -1,5 +1,6 @@
 package routor.src.data.repositories
 
+import kotlinx.coroutines.flow.Flow
 import routor.src.data.database.RoutesDao
 import routor.src.data.types.Route
 import javax.inject.Inject
@@ -19,6 +20,10 @@ class RouteRepository @Inject constructor(
 
     suspend fun deleteRoute(route: Route){
         routesDao.deleteRoute(route)
+    }
+
+    fun getRoute(routeId: Long) : Flow<Route?> {
+        return routesDao.getRoute(routeId)
     }
 
     suspend fun getAllRoutes(): List<Route> {
