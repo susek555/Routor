@@ -2,8 +2,6 @@ package routor.src.screens.main
 
 import android.content.Context
 import android.content.Intent
-import androidx.compose.runtime.MutableState
-import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import routor.src.dialogFactory.confirmDialog.ConfirmDialogConfig
@@ -38,20 +36,17 @@ class MainViewModel @Inject constructor(
     private val dialogFactory: ConfirmDialogFactory,
     @ApplicationContext private val context: Context,
 ) : ViewModel() {
+    // Constant
+    private val MINIMUM_NUMBER_OF_POINTS = 10
 
-    // TODO detach class UI state
-
-    val locationStats = locationRepository.locationStatsFlow
-    val duration = locationRepository.duration
-    val currentLocation = locationRepository.currentLocation
-
+    // recording route toggle
     private val _isServiceRecordingRoute = MutableStateFlow(false)
     val isServiceRecordingRoute = _isServiceRecordingRoute.asStateFlow()
 
+    // currently recorded route
     private var currentRoute: MutableStateFlow<Route?> = MutableStateFlow(null)
 
-    private val MINIMUM_NUMBER_OF_POINTS = 10
-
+    // end route dialogs state
     private val _isStopRouteDialogOpen = MutableStateFlow(false)
     private val _stopRouteDialogConfig = MutableStateFlow<ConfirmDialogConfig?>(
         dialogFactory.create(
@@ -63,19 +58,33 @@ class MainViewModel @Inject constructor(
     val stopRouteDialogState = combine(_isStopRouteDialogOpen, _stopRouteDialogConfig) {isVisible, config ->
         ConfirmDialogState(isVisible, config)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), ConfirmDialogState(false, null))
+
+    // center map event
     private val _centerMapEvent = MutableSharedFlow<LatLng>(replay = 0)
     val centerMapEvent = _centerMapEvent.asSharedFlow()
 
-     init {
+    // UI state
+    val uiState = combine(
+        locationRepository.currentLocation,
+        locationRepository.routeStatsFlow,
+        locationRepository.duration,
+        _isServiceRecordingRoute,
+        combine(_isStopRouteDialogOpen, _stopRouteDialogConfig) { isVisible, config ->
+            ConfirmDialogState(isVisible, config)
+        }
+    ) { loc, stats, dur, recording, dialog ->
+        MainScreenUiState(loc, stats, dur, recording, dialog)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), MainScreenUiState())
 
+     init {
          // center map on user location
          viewModelScope.launch {
              if (!_isServiceRecordingRoute.value){
                  sendActionToLocationService(LocationService.ACTION_GET_SINGLE_LOCATION)
 
                  // wait for location to appear
-                 currentLocation.first { it != null }
-                 _centerMapEvent.emit(currentLocation.value!!)
+                 locationRepository.currentLocation.first { it != null }
+                 _centerMapEvent.emit(locationRepository.currentLocation.value!!)
              }
          }
     }
@@ -109,8 +118,8 @@ class MainViewModel @Inject constructor(
                 }
             }
             MainScreenEvent.CenterMapOnCurrentLocation -> {
-                currentLocation.value?.let {
-                    viewModelScope.launch { _centerMapEvent.emit(currentLocation.value!!) }
+                locationRepository.currentLocation.value?.let {
+                    viewModelScope.launch { _centerMapEvent.emit(locationRepository.currentLocation.value!!) }
                     if (!_isServiceRecordingRoute.value){
                         sendActionToLocationService(LocationService.ACTION_GET_SINGLE_LOCATION)
                     }
@@ -129,7 +138,7 @@ class MainViewModel @Inject constructor(
 
     //dialog
     private fun setDialogConfig() {
-        if(locationStats.value.numberOfPointsOnRoute < MINIMUM_NUMBER_OF_POINTS){
+        if(locationRepository.routeStatsFlow.value.numberOfPointsOnRoute < MINIMUM_NUMBER_OF_POINTS){
             _stopRouteDialogConfig.value = dialogFactory.create(
                 ConfirmDialogConfigState.RouteNotLongEnough,
                 onConfirm = { onEvent(MainScreenEvent.CancelRoute)},
@@ -188,9 +197,9 @@ class MainViewModel @Inject constructor(
         println(name)
         routeRepository.updateRoute(currentRoute.value!!.copy(
             name = name,
-            numberOfPoints = locationStats.value.numberOfPointsOnRoute,
-            duration = duration.value,
-            distanceKm = locationStats.value.totalDistanceKm,
+            numberOfPoints = locationRepository.routeStatsFlow.value.numberOfPointsOnRoute,
+            duration = locationRepository.duration.value,
+            distanceKm = locationRepository.routeStatsFlow.value.totalDistanceKm,
         ))
     }
 }

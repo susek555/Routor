@@ -25,7 +25,7 @@ class LocationRepository @Inject constructor(
     private var numberOfPointsOnRoute: Int = 0
 
     private val _routeStatsFlow = MutableStateFlow(RouteStats())
-    val locationStatsFlow = _routeStatsFlow.asStateFlow()
+    val routeStatsFlow = _routeStatsFlow.asStateFlow()
     private val _currentLocation = MutableStateFlow<LatLng?>(null)
     val currentLocation = _currentLocation.asStateFlow()
     private val _duration = MutableStateFlow(0L)

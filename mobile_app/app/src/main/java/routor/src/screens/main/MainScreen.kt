@@ -42,12 +42,8 @@ fun MainScreen(
     displayGenerationsScreen: () -> Unit,
     viewModel: MainViewModel
 ) {
-    val isServiceRecordingRoute by viewModel.isServiceRecordingRoute.collectAsStateWithLifecycle()
-    val stopRouteDialogState by viewModel.stopRouteDialogState.collectAsStateWithLifecycle()
-
-    val currentLocation by viewModel.currentLocation.collectAsStateWithLifecycle()
-    val routeStats by viewModel.locationStats.collectAsStateWithLifecycle()
-    val duration by viewModel.duration.collectAsStateWithLifecycle()
+    // UI state from viewModel
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     //map
     val context = LocalContext.current
@@ -64,20 +60,20 @@ fun MainScreen(
     }
 
     // animate route and user location
-     LaunchedEffect(currentLocation, routeStats.points, isServiceRecordingRoute) {
-        if (isServiceRecordingRoute) {
-            if (routeStats.points.isNotEmpty()) {
-                MapHelper.updateRoute(mapView, routeStats.points)
+     LaunchedEffect(uiState.currentLocation, uiState.routeStats.points, uiState.isRecording) {
+        if (uiState.isRecording) {
+            if (uiState.routeStats.points.isNotEmpty()) {
+                MapHelper.updateRoute(mapView, uiState.routeStats.points)
             }
         } else {
-            if (currentLocation != null) {
-                MapHelper.updateUserLocation(mapView, currentLocation!!)
+            if (uiState.currentLocation != null) {
+                MapHelper.updateUserLocation(mapView, uiState.currentLocation!!)
             }
         }
     }
 
     // clear route on start or stop recording
-    LaunchedEffect(isServiceRecordingRoute) {
+    LaunchedEffect(uiState.isRecording) {
         MapHelper.clearRoute(mapView)
     }
 
@@ -94,7 +90,7 @@ fun MainScreen(
                 factory = { mapView },
                 update = {}
             )
-            if (!isServiceRecordingRoute) {
+            if (!uiState.isRecording) {
 
                 //TODO rearrange to NavBar
                 Button(
@@ -146,15 +142,15 @@ fun MainScreen(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceEvenly
                     ) {
-                        StatItem(label = "DISTANCE", value = "${"%.2f".format(routeStats.totalDistanceKm)} km")
-                        StatItem(label = "SPEED", value = "${"%.2f".format(routeStats.speedKmh)} km/h")
-                        StatItem(label = "DURATION", value = formatTime(duration))
+                        StatItem(label = "DISTANCE", value = "${"%.2f".format(uiState.routeStats.totalDistanceKm)} km")
+                        StatItem(label = "SPEED", value = "${"%.2f".format(uiState.routeStats.speedKmh)} km/h")
+                        StatItem(label = "DURATION", value = formatTime(uiState.duration))
                     }
 
-                    if (isServiceRecordingRoute) {
+                    if (uiState.isRecording) {
                         Spacer(modifier = Modifier.height(10.dp))
                         Text(
-                            text = "Points: ${routeStats.numberOfPointsOnRoute}",
+                            text = "Points: ${uiState.routeStats.numberOfPointsOnRoute}",
                             fontSize = 12.sp,
                             color = Color.Gray
                         )
@@ -166,7 +162,7 @@ fun MainScreen(
                     modifier = Modifier.padding(bottom = 50.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    if (isServiceRecordingRoute) {
+                    if (uiState.isRecording) {
                         StopButton(onClick = { viewModel.onEvent(MainScreenEvent.ShowStopRouteDialog) })
                     } else {
                         StartButton(onClick = { viewModel.onEvent(MainScreenEvent.StartRoute) })
@@ -175,8 +171,8 @@ fun MainScreen(
             }
         }
     }
-    if(stopRouteDialogState.isVisible){
-        ConfirmDialog(stopRouteDialogState.config!!)
+    if(uiState.dialogState.isVisible){
+        ConfirmDialog(uiState.dialogState.config!!)
     }
 }
 

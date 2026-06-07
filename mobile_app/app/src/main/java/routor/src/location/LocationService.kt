@@ -1,14 +1,9 @@
 package routor.src.location
 
-import android.app.NotificationManager
 import android.app.Service
-import android.content.Context
 import android.content.Intent
 import android.os.Binder
 import android.os.IBinder
-import android.widget.Toast
-import androidx.core.app.NotificationCompat
-import routor.R
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -75,7 +70,7 @@ class LocationService: Service() {
 
                 repository.updateDuration(duration)
 
-                val currentStats = repository.locationStatsFlow.value
+                val currentStats = repository.routeStatsFlow.value
                 notificator.update(currentStats, duration)
             }
         }
