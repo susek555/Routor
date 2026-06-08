@@ -38,6 +38,9 @@ object MapHelper {
     private const val START_ICON_ID = "start-icon"
     private const val START_SOURCE_ID = "start-source"
     private const val START_LAYER_ID = "start-layer"
+    private const val END_ICON_ID = "end-icon"
+    private const val END_SOURCE_ID = "end-source"
+    private const val END_LAYER_ID = "end-layer"
 
     private fun init(context: Context) {
         MapLibre.getInstance(context, null, WellKnownTileServer.MapLibre)
@@ -62,6 +65,8 @@ object MapHelper {
 
         val emptySource = GeoJsonSource(USER_SOURCE_ID)
         style.addSource(emptySource)
+
+        // TODO probably turn off rotation due to visual bugs
 
         val symbolLayer = SymbolLayer(USER_LAYER_ID, USER_SOURCE_ID)
         symbolLayer.setProperties(
@@ -93,7 +98,7 @@ object MapHelper {
         }
     }
 
-    private fun setupStartLocationLayer(style: Style, context: Context) {
+    private fun setupRouteStartLayer(style: Style, context: Context) {
         val bitmap = getBitmapFromVectorDrawable(context, R.drawable.route_begin_dot)
         style.addImage(START_ICON_ID, bitmap)
 
@@ -111,18 +116,38 @@ object MapHelper {
         style.addLayerAbove(symbolLayer, ROUTE_LAYER_ID)
     }
 
-    private fun getMapView(context: Context, hasUserLocation: Boolean, hasRouteLayer: Boolean): MapView {
+    private fun setupRouteEndLayer(style: Style, context: Context) {
+        val bitmap = getBitmapFromVectorDrawable(context, R.drawable.route_end_dot)
+        style.addImage(END_LAYER_ID, bitmap)
+
+        val emptySource = GeoJsonSource(END_SOURCE_ID)
+        style.addSource(emptySource)
+
+        val symbolLayer = SymbolLayer(END_LAYER_ID, END_SOURCE_ID)
+        symbolLayer.setProperties(
+            PropertyFactory.iconImage(END_ICON_ID),
+            PropertyFactory.iconAllowOverlap(true),
+            PropertyFactory.iconIgnorePlacement(true),
+            PropertyFactory.iconRotationAlignment(Property.ICON_ROTATION_ALIGNMENT_VIEWPORT)
+        )
+
+        style.addLayerAbove(symbolLayer, ROUTE_LAYER_ID)
+    }
+
+    private fun getMapView(context: Context, hasUserLocation: Boolean): MapView {
         init(context)
         val mapView = MapView(context)
 
         mapView.getMapAsync { map ->
             map.setStyle(MAP_STYLE_URL) { style ->
+
+                setupRouteLayer(style)
+                setupRouteStartLayer(style, context)
+
                 if(hasUserLocation) {
                     setupUserLocationLayer(style, context)
-                }
-                if(hasRouteLayer) {
-                    setupRouteLayer(style)
-                    setupStartLocationLayer(style, context)
+                } else {
+                    setupRouteEndLayer(style, context)
                 }
             }
 
@@ -142,16 +167,14 @@ object MapHelper {
     fun getMainScreenMapView(context: Context): MapView {
         return getMapView(
             context = context,
-            hasUserLocation = true,
-            hasRouteLayer = true
+            hasUserLocation = true
         )
     }
 
     fun getRouteScreenMapView(context: Context): MapView {
         return getMapView(
             context = context,
-            hasUserLocation = false,
-            hasRouteLayer = true
+            hasUserLocation = false
         )
     }
 
