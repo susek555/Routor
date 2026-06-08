@@ -71,6 +71,16 @@ fun RouteDetailsScreen(
                         update = {}
                     )
                 }
+                Spacer(
+                    modifier = Modifier
+                        .padding(5.dp)
+                )
+                Text(
+                    modifier = Modifier
+                        .align(Alignment.CenterHorizontally),
+                    style = TextStyle(fontSize = 25.sp, fontWeight = FontWeight.Bold),
+                    text = currentState.route.name
+                )
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
