@@ -51,6 +51,8 @@ fun RouteDetailsScreen(
         }
     }
 
+    // TODO add zoom in on route
+
     //map
     val context = LocalContext.current
     val mapView = remember {

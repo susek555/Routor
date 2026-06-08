@@ -17,6 +17,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 @Composable
 fun RoutesScreen(
@@ -24,7 +25,7 @@ fun RoutesScreen(
     displayRouteDetailsScreen: (Long) -> Unit,
     viewModel: RoutesViewModel
 ){
-    val routes by viewModel.routes.collectAsState()
+    val routesList by viewModel.routes.collectAsStateWithLifecycle(initialValue = emptyList())
 
     // TODO make it prettier
 
@@ -42,7 +43,7 @@ fun RoutesScreen(
             modifier = Modifier.fillMaxSize(),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            items(routes) { route ->
+            items(routesList) { route ->
                 Row(
                     modifier = Modifier.fillMaxWidth()
                 ) {

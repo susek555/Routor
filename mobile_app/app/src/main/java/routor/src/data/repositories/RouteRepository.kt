@@ -26,7 +26,7 @@ class RouteRepository @Inject constructor(
         return routesDao.getRoute(routeId)
     }
 
-    suspend fun getAllRoutes(): List<Route> {
+    fun getAllRoutes(): Flow<List<Route>> {
         return routesDao.getAllRoutes()
     }
 }

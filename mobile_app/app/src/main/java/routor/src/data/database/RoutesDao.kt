@@ -23,5 +23,5 @@ interface RoutesDao {
     fun getRoute(routeId: Long) : Flow<Route?>
 
     @Query("SELECT * FROM routes ORDER BY id ASC")
-    suspend fun getAllRoutes() : List<Route>
+    fun getAllRoutes() : Flow<List<Route>>
 }
