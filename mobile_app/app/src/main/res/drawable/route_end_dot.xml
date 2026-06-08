@@ -14,19 +14,23 @@
 
     <clip-path android:pathData="M12,12m-8,0a8,8 0,1,1 16,0a8,8 0,1,1 -16,0" />
 
-    <path
-        android:fillColor="#000000"
-        android:pathData="M4,4h8v8h-8z" />
+    <path android:fillColor="#000000" android:pathData="M4,4h4v4h-4z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M8,4h4v4h-4z" />
+    <path android:fillColor="#000000" android:pathData="M12,4h4v4h-4z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M16,4h4v4h-4z" />
 
-    <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M12,4h8v8h-8z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M4,8h4v4h-4z" />
+    <path android:fillColor="#000000" android:pathData="M8,8h4v4h-4z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M12,8h4v4h-4z" />
+    <path android:fillColor="#000000" android:pathData="M16,8h4v4h-4z" />
 
-    <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M4,12h8v8h-8z" />
+    <path android:fillColor="#000000" android:pathData="M4,12h4v4h-4z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M8,12h4v4h-4z" />
+    <path android:fillColor="#000000" android:pathData="M12,12h4v4h-4z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M16,12h4v4h-4z" />
 
-    <path
-        android:fillColor="#000000"
-        android:pathData="M12,12h8v8h-8z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M4,16h4v4h-4z" />
+    <path android:fillColor="#000000" android:pathData="M8,16h4v4h-4z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M12,16h4v4h-4z" />
+    <path android:fillColor="#000000" android:pathData="M16,16h4v4h-4z" />
 </vector>

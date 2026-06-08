@@ -55,6 +55,7 @@ fun RouteDetailsScreen(
             Text("Route not found")
         }
         is RouteDetailsUiState.Success -> {
+            MapHelper.displayFullRoute(mapView, currentState.points)
 
             Column(
                 modifier = Modifier

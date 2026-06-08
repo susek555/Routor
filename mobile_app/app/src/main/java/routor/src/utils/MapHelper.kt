@@ -118,7 +118,7 @@ object MapHelper {
 
     private fun setupRouteEndLayer(style: Style, context: Context) {
         val bitmap = getBitmapFromVectorDrawable(context, R.drawable.route_end_dot)
-        style.addImage(END_LAYER_ID, bitmap)
+        style.addImage(END_ICON_ID, bitmap)
 
         val emptySource = GeoJsonSource(END_SOURCE_ID)
         style.addSource(emptySource)
@@ -302,6 +302,34 @@ object MapHelper {
 
             routeSource?.setGeoJson(FeatureCollection.fromFeatures(emptyList()))
             startSource?.setGeoJson(FeatureCollection.fromFeatures(emptyList()))
+        }
+    }
+
+    fun displayFullRoute(mapView: MapView, points: List<routor.src.data.types.Point>) {
+        mapView.getMapAsync { map ->
+            val style = map.style ?: return@getMapAsync
+            val routeSource = style.getSourceAs<GeoJsonSource>(ROUTE_SOURCE_ID) ?: return@getMapAsync
+            val startSource = style.getSourceAs<GeoJsonSource>(START_SOURCE_ID) ?: return@getMapAsync
+            val endSource = style.getSourceAs<GeoJsonSource>(END_SOURCE_ID) ?: return@getMapAsync
+
+            if (points.isEmpty()) {
+                clearRoute(mapView)
+                return@getMapAsync
+            }
+
+            // start green point
+            val firstPoint = Point.fromLngLat(points.first().longitude, points.first().latitude)
+            startSource.setGeoJson(Feature.fromGeometry(firstPoint))
+
+            // finish point
+            val lastPoint = Point.fromLngLat(points.last().longitude, points.last().latitude)
+            endSource.setGeoJson(Feature.fromGeometry(lastPoint))
+
+            // route
+            if (points.size >= 2) {
+                val mapboxPoints = points.map { Point.fromLngLat(it.longitude, it.latitude) }
+                routeSource.setGeoJson(Feature.fromGeometry(LineString.fromLngLats(mapboxPoints)))
+            }
         }
     }
 }
