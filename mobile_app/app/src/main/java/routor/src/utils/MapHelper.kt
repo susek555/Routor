@@ -13,6 +13,7 @@ import androidx.lifecycle.compose.LifecycleEventEffect
 import org.maplibre.android.MapLibre
 import org.maplibre.android.WellKnownTileServer
 import org.maplibre.android.camera.CameraUpdateFactory
+import org.maplibre.android.geometry.LatLngBounds
 import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
@@ -194,8 +195,6 @@ object MapHelper {
         }
     }
 
-
-
     fun centerCameraOnUserLocation(mapView: MapView, userLocation: LatLng) {
         mapView.getMapAsync { map ->
             val cameraUpdate = CameraUpdateFactory.newLatLngZoom(userLocation, 15.0)
@@ -296,39 +295,64 @@ object MapHelper {
 
     fun clearRoute(mapView: MapView) {
         mapView.getMapAsync { map ->
-            val style = map.style ?: return@getMapAsync
-            val routeSource = style.getSourceAs<GeoJsonSource>(ROUTE_SOURCE_ID)
-            val startSource = style.getSourceAs<GeoJsonSource>(START_SOURCE_ID)
+            map.getStyle { style ->
+                val routeSource = style.getSourceAs<GeoJsonSource>(ROUTE_SOURCE_ID)
+                val startSource = style.getSourceAs<GeoJsonSource>(START_SOURCE_ID)
+                val endSource = style.getSourceAs<GeoJsonSource>(END_SOURCE_ID)
 
-            routeSource?.setGeoJson(FeatureCollection.fromFeatures(emptyList()))
-            startSource?.setGeoJson(FeatureCollection.fromFeatures(emptyList()))
+                routeSource?.setGeoJson(FeatureCollection.fromFeatures(emptyList()))
+                startSource?.setGeoJson(FeatureCollection.fromFeatures(emptyList()))
+                endSource?.setGeoJson(FeatureCollection.fromFeatures(emptyList()))
+            }
         }
     }
 
     fun displayFullRoute(mapView: MapView, points: List<routor.src.data.types.Point>) {
         mapView.getMapAsync { map ->
-            val style = map.style ?: return@getMapAsync
-            val routeSource = style.getSourceAs<GeoJsonSource>(ROUTE_SOURCE_ID) ?: return@getMapAsync
-            val startSource = style.getSourceAs<GeoJsonSource>(START_SOURCE_ID) ?: return@getMapAsync
-            val endSource = style.getSourceAs<GeoJsonSource>(END_SOURCE_ID) ?: return@getMapAsync
+            map.getStyle { style ->
+                val routeSource = style.getSourceAs<GeoJsonSource>(ROUTE_SOURCE_ID) ?: return@getStyle
+                val startSource = style.getSourceAs<GeoJsonSource>(START_SOURCE_ID) ?: return@getStyle
+                val endSource = style.getSourceAs<GeoJsonSource>(END_SOURCE_ID) ?: return@getStyle
 
-            if (points.isEmpty()) {
-                clearRoute(mapView)
-                return@getMapAsync
+                if (points.isEmpty()) {
+                    clearRoute(mapView)
+                    return@getStyle
+                }
+
+                // start green point
+                val firstPoint = Point.fromLngLat(points.first().longitude, points.first().latitude)
+                startSource.setGeoJson(Feature.fromGeometry(firstPoint))
+
+                // finish point
+                val lastPoint = Point.fromLngLat(points.last().longitude, points.last().latitude)
+                endSource.setGeoJson(Feature.fromGeometry(lastPoint))
+
+                // route
+                if (points.size >= 2) {
+                    val mapboxPoints = points.map { Point.fromLngLat(it.longitude, it.latitude) }
+                    routeSource.setGeoJson(Feature.fromGeometry(LineString.fromLngLats(mapboxPoints)))
+                }
+            }
+        }
+    }
+
+    fun zoomToRoute(mapView: MapView, points: List<routor.src.data.types.Point>, paddingPx: Int = 150) {
+        if (points.size < 2) return
+
+        mapView.getMapAsync { map ->
+            val builder = LatLngBounds.Builder()
+
+            points.forEach { point ->
+                builder.include(LatLng(point.latitude, point.longitude))
             }
 
-            // start green point
-            val firstPoint = Point.fromLngLat(points.first().longitude, points.first().latitude)
-            startSource.setGeoJson(Feature.fromGeometry(firstPoint))
+            try {
+                val bounds = builder.build()
+                val cameraUpdate = CameraUpdateFactory.newLatLngBounds(bounds, paddingPx)
 
-            // finish point
-            val lastPoint = Point.fromLngLat(points.last().longitude, points.last().latitude)
-            endSource.setGeoJson(Feature.fromGeometry(lastPoint))
-
-            // route
-            if (points.size >= 2) {
-                val mapboxPoints = points.map { Point.fromLngLat(it.longitude, it.latitude) }
-                routeSource.setGeoJson(Feature.fromGeometry(LineString.fromLngLats(mapboxPoints)))
+                map.animateCamera(cameraUpdate, 1000)
+            } catch (e: Exception) {
+                e.printStackTrace()
             }
         }
     }

@@ -113,7 +113,10 @@ fun RouteDetailsScreen(
                     Text("Route not found")
                 }
                 is RouteDetailsUiState.Success -> {
-                    MapHelper.displayFullRoute(mapView, currentState.points)
+                    LaunchedEffect(currentState.points) {
+                        MapHelper.displayFullRoute(mapView, currentState.points)
+                        MapHelper.zoomToRoute(mapView, currentState.points, paddingPx = 200)
+                    }
 
                     Column(
                         modifier = Modifier
@@ -163,7 +166,7 @@ fun RouteDetailsScreen(
                                         )
                                         StatItem(
                                             label = "AVERAGE SPEED",
-                                            value = "${"%.2f".format(currentState.route.distanceKm / (currentState.route.duration * 60 * 60))} km/h"
+                                            value = "${"%.2f".format(currentState.route.distanceKm / (currentState.route.duration) * 60 * 60)} km/h"
                                         )
                                         StatItem(label = "DURATION", value = formatTime(currentState.route.duration))
                                     }
