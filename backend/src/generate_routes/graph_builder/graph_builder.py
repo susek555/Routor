@@ -13,9 +13,10 @@ class GraphBuilder:
         tile_pointers = TileResolver.resolve_tiles(center, radius)
         tiles = TileCacheManager.get_tiles(tile_pointers)
         map = nx.compose_all(tiles)
-        return ox.truncate.truncate_graph_dist(
-            map, cls._calc_closest_node_id(map, center), radius
-        )
+        # return ox.truncate.truncate_graph_dist(
+        #     map, cls._calc_closest_node_id(map, center), radius
+        # )
+        return map
 
     @staticmethod
     def _calc_closest_node_id(map: Map, center: GeoPoint) -> int:

@@ -15,7 +15,9 @@ class TileDownloader:
 
         try:
             graph = ox.graph_from_bbox(
-                bbox=(b.west, b.south, b.east, b.north), network_type=network_type
+                bbox=(b.west, b.south, b.east, b.north),
+                network_type=network_type,
+                retain_all=True,
             )
             return graph
         except Exception as e:
