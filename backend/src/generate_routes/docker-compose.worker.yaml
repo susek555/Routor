@@ -28,8 +28,3 @@ services:
       db:
         condition: service_healthy
     restart: unless-stopped
-
-volumes:
-  tile_cache_volume:
-    external: true
-    name: routor_tile_cache

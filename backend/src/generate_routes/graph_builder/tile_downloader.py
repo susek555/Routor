@@ -4,6 +4,9 @@ import osmnx as ox
 from src.generate_routes.graph_builder.data.map_tile import MapTile
 from src.generate_routes.graph_builder.data.tile_pointer import TilePointer
 
+ox.settings.timeout = 180
+ox.settings.overpass_endpoint = "https://overpass.kumi.systems/api/interpreter"
+
 
 class TileDownloader:
     @staticmethod
@@ -12,9 +15,9 @@ class TileDownloader:
 
         try:
             graph = ox.graph_from_bbox(
-                bbox=(b.north, b.south, b.east, b.west), network_type=network_type
+                bbox=(b.west, b.south, b.east, b.north), network_type=network_type
             )
             return graph
-        except Exception:
-            # empty graph fallback (TODO, not good)
+        except Exception as e:
+            print(f"⚠️ Błąd pobierania kafelka {tile_pointer.id}: {e}")
             return nx.MultiDiGraph()

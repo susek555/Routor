@@ -8,14 +8,10 @@ from src.generate_routes.graph_builder.tile_resolver import TileResolver
 
 
 class GraphBuilder:
-    _TILE_BOX_RADIUS_METERS = 2500
-
     @classmethod
     def build_graph(cls, center: GeoPoint, radius: float) -> Map:
-        tile_pointers = TileResolver.resolve_tiles(
-            center, radius, cls._TILE_BOX_RADIUS_METERS
-        )
-        tiles = TileCacheManager.get_tiles(tile_pointers, cls._TILE_BOX_RADIUS_METERS)
+        tile_pointers = TileResolver.resolve_tiles(center, radius)
+        tiles = TileCacheManager.get_tiles(tile_pointers)
         map = nx.compose_all(tiles)
         return ox.truncate.truncate_graph_dist(
             map, cls._calc_closest_node_id(map, center), radius

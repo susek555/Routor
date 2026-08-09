@@ -65,7 +65,7 @@ class TileCacheManager:
         # ---------------------------------------------------------
         # 3: Download from API (Cache Miss)
         # ---------------------------------------------------------
-        print(f"[API] Downloading new tile z OSM: {pointer.id}")
+        print(f"[API] Downloading new tile from OSM: {pointer.id}")
 
         tile = TileDownloader.download_tile(pointer)
 
