@@ -8,6 +8,7 @@ dependencies = [
     "aiosqlite>=0.22.1",
     "asyncpg>=0.31.0",
     "celery>=5.6.3",
+    "diskcache>=5.6.3",
     "fastapi>=0.136.3",
     "fastapi-users[sqlalchemy]>=15.0.5",
     "firebase-admin>=7.4.0",
