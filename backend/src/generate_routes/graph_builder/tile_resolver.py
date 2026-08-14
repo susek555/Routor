@@ -6,7 +6,7 @@ from src.generate_routes.graph_builder.data.tile_pointer import TilePointer
 
 
 class TileResolver:
-    ZOOM_LEVEL = 14
+    ZOOM_LEVEL = 12
 
     @classmethod
     def resolve_tiles(cls, center: GeoPoint, radius_meters: float) -> list[TilePointer]:

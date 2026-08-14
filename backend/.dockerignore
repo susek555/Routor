@@ -1,1 +1,8 @@
 .venv/
+test/
+.vscode/
+.pytest_cache/
+.tiles_data/
+poland-latest.osm.pbf
+*.pbf
+*.pkl

@@ -6,10 +6,6 @@ networks:
   routor_network:
     driver: bridge
 
-volumes:
-  tile_cache_volume:
-    name: routor_tile_cache
-
 services:
   api:
     container_name: routor_api
@@ -31,7 +27,7 @@ services:
     networks:
       - routor_network
     volumes:
-      - tile_cache_volume:/app/cache/tiles
+      - ./tiles_data:/app/tiles_data:ro
     depends_on:
       db:
         condition: service_healthy
@@ -42,8 +38,7 @@ services:
   redis:
     image: redis:7-alpine
     container_name: routor_redis
-    # LRU for files with TTL set (celery queue is preserved)
-    command: redis-server --maxmemory 500mb --maxmemory-policy volatile-lru
+    command: redis-server --maxmemory 64mb --maxmemory-policy noeviction
     ports:
       - "6379:6379"
     networks:

@@ -8,7 +8,6 @@ services:
         COPY --from=ghcr.io/astral-sh/uv:0.11.17 /uv /uvx /bin/
         RUN useradd -m routor_user
         COPY . /app
-        RUN mkdir -p /app/cache/tiles
         RUN chown -R routor_user:routor_user /app
         ENV UV_NO_DEV=1
         WORKDIR /app
@@ -21,7 +20,7 @@ services:
     networks:
       - routor_network
     volumes:
-      - tile_cache_volume:/app/cache/tiles
+      - ../../tiles_data:/app/tiles_data:ro
     depends_on:
       redis:
         condition: service_started
