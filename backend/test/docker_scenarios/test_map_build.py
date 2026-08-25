@@ -10,7 +10,7 @@ ox.settings.use_cache = False
 
 def main():
     center = GeoPoint(latitude=52.2297, longitude=21.0122)
-    radius_meters = 5000.0
+    radius_meters = 1000.0
 
     print(f"Szukam kafelków w katalogu: {os.path.abspath(TileLoader.TILES_DIR)}")
     print(f"Budowanie grafu dla punktu ({center.latitude}, {center.longitude}) o promieniu {radius_meters}m...")

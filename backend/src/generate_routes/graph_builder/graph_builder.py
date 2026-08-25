@@ -10,6 +10,11 @@ from src.generate_routes.graph_builder.tile_resolver import TileResolver
 class GraphBuilder:
     @classmethod
     def build_graph(cls, center: GeoPoint, radius: float) -> Map:
+        # 10% margin with radius
+        RADIUS_MULT = 1.1
+
+        radius = radius * RADIUS_MULT
+
         tile_pointers = TileResolver.resolve_tiles(center, radius)
         tiles = TileLoader.get_tiles(tile_pointers)
 
@@ -23,9 +28,7 @@ class GraphBuilder:
         else:
             map.graph["crs"] = "epsg:4326"
 
-        return ox.truncate.truncate_graph_dist(
-            map, cls._calc_closest_node_id(map, center), radius
-        )
+        return ox.truncate.truncate_graph_dist(map, cls._calc_closest_node_id(map, center), radius)
 
     @staticmethod
     def _calc_closest_node_id(map: Map, center: GeoPoint) -> int:
