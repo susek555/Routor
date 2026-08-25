@@ -17,6 +17,12 @@ class GraphBuilder:
             return nx.MultiDiGraph()
 
         map = nx.compose_all(tiles)
+
+        if tiles and hasattr(tiles[0], "graph") and "crs" in tiles[0].graph:
+            map.graph["crs"] = tiles[0].graph["crs"]
+        else:
+            map.graph["crs"] = "epsg:4326"
+
         return ox.truncate.truncate_graph_dist(
             map, cls._calc_closest_node_id(map, center), radius
         )

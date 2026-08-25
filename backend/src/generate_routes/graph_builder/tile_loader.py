@@ -8,7 +8,7 @@ from src.generate_routes.graph_builder.data.tile_pointer import TilePointer
 
 
 class TileLoader:
-    TILES_DIR = "/app/tiles_data"
+    TILES_DIR = "./tiles_data"
 
     @classmethod
     def get_tiles(cls, tile_pointers: list[TilePointer]) -> list[MapTile]:
