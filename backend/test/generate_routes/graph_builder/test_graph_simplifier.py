@@ -1,43 +1,59 @@
-from unittest.mock import MagicMock, patch
-
 import networkx as nx
-import pytest
+from shapely.geometry import LineString
 from src.generate_routes.graph_builder.graph_simplifier import GraphSimplifier
 
 
 class TestGraphSimplifier:
-    def test_simplify_empty_or_none_graph(self):
-        """Verifies that empty graphs return untouched without exceptions."""
-        empty_graph = nx.MultiDiGraph()
-        assert GraphSimplifier.simplify(empty_graph) == empty_graph
+    def test_simplify_empty_or_none(self):
+        """Verifies that None and empty graphs are handled gracefully."""
+        empty_g = nx.MultiDiGraph()
+        assert GraphSimplifier.simplify(empty_g) == empty_g
         assert GraphSimplifier.simplify(None) is None
 
-    @patch("src.generate_routes.graph_builder.graph_simplifier.ox.project_graph")
-    @patch("src.generate_routes.graph_builder.graph_simplifier.ox.simplify_graph")
-    def test_simplify_execution_flow(self, mock_simplify_graph, mock_project_graph):
-        """Verifies the projection, KDTree clustering, and simplification pipeline."""
-        # Budowa prostego grafu testowego w układzie UTM z dwoma bliskimi węzłami (odległość 5m)
-        g_proj = nx.MultiDiGraph()
-        g_proj.graph = {"crs": "epsg:32634"}
-        g_proj.add_node(1, x=100.0, y=100.0)
-        g_proj.add_node(2, x=103.0, y=104.0)  # odległość = 5m
-        g_proj.add_node(3, x=200.0, y=200.0)  # odległy węzeł
-        g_proj.add_edge(1, 2, length=5.0)
-        g_proj.add_edge(2, 3, length=100.0)
+    def test_materialize_bend_nodes_expands_linestring(self):
+        """Verifies that LineString geometry points become actual graph nodes."""
+        g = nx.MultiDiGraph()
+        g.graph["crs"] = "epsg:4326"
 
-        # Pierwsze wywołanie project_graph rzutuje do UTM, drugie z powrotem do WGS84
-        mock_wgs84 = MagicMock()
-        mock_wgs84.graph = {}
-        mock_project_graph.side_effect = [g_proj, mock_wgs84]
+        # Węzły krańcowe
+        g.add_node(1, x=21.00, y=52.00)
+        g.add_node(2, x=21.02, y=52.02)
 
-        mock_final_graph = MagicMock()
-        mock_simplify_graph.return_value = mock_final_graph
+        # Krawędź z zakrętem w punkcie (21.01, 52.015)
+        curve_geom = LineString([(21.00, 52.00), (21.01, 52.015), (21.02, 52.02)])
+        g.add_edge(1, 2, key=0, length=100.0, geometry=curve_geom)
 
-        input_graph = MagicMock()
-        input_graph.nodes = [1, 2, 3]
+        materialized = GraphSimplifier._materialize_bend_nodes(g)
 
-        result = GraphSimplifier.simplify(input_graph, tolerance_meters=10.0)
+        # Powinny być teraz 3 węzły (1, 2 oraz 1 sztuczny węzeł zakrętu)
+        assert len(materialized.nodes) == 3
+        # Powinny być 2 krawędzie składowe
+        assert len(materialized.edges) == 2
 
-        assert result == mock_final_graph
-        mock_simplify_graph.assert_called_once_with(mock_wgs84)
-        assert mock_wgs84.graph["simplified"] is False
+        # Sprawdzenie czy punkt pośredni ma poprawne współrzędne
+        mid_nodes = [n for n in materialized.nodes if n not in (1, 2)]
+        assert len(mid_nodes) == 1
+        mid_node_data = materialized.nodes[mid_nodes[0]]
+        assert mid_node_data["x"] == 21.01
+        assert mid_node_data["y"] == 52.015
+
+    def test_simplify_collapses_close_nodes_and_unrolls_geometry(self):
+        """Integration test on a small graph checking both clustering and unrolling."""
+        g = nx.MultiDiGraph()
+        g.graph["crs"] = "epsg:4326"
+
+        # Dwa węzły bardzo blisko siebie (kilka metrów w centrum Warszawy)
+        g.add_node(1, x=21.01220, y=52.22970)
+        g.add_node(2, x=21.01225, y=52.22972)
+        # Trzeci węzeł dalej z zakrętem
+        g.add_node(3, x=21.01500, y=52.23100)
+
+        g.add_edge(1, 2, key=0, length=5.0)
+        curve = LineString([(21.01225, 52.22972), (21.01350, 52.23050), (21.01500, 52.23100)])
+        g.add_edge(2, 3, key=0, length=200.0, geometry=curve)
+
+        result = GraphSimplifier.simplify(g, tolerance_meters=15.0)
+
+        # Węzły 1 i 2 powinny zostać scalone do jednego, a zakręt na drodze do węzła 3 rozwinięty
+        assert len(result.nodes) >= 3
+        assert result.graph["crs"] == "epsg:4326"

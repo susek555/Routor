@@ -1,9 +1,9 @@
 import os
+
 import networkx as nx
+import numpy as np
 import osmnx as ox
 from scipy.spatial import cKDTree
-import numpy as np
-
 from src.database.geo_point import GeoPoint
 from src.generate_routes.graph_builder.graph_builder import GraphBuilder
 from src.generate_routes.graph_builder.tile_loader import TileLoader
