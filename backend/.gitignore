@@ -7,3 +7,4 @@ google_firebase_credentials.json
 poland-latest.osm.pbf
 *.pbf
 *.pkl
+*.tif
