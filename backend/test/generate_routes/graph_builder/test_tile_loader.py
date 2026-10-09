@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, mock_open, patch
 
 import networkx as nx
 import pytest
-from src.generate_routes.graph_builder.data.tile_pointer import TilePointer
+from src.generate_routes.data.tile_pointer import TilePointer
 from src.generate_routes.graph_builder.tile_loader import TileLoader
 
 

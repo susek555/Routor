@@ -3,8 +3,8 @@ import pickle
 
 import networkx as nx
 
-from src.generate_routes.graph_builder.data.map_tile import MapTile
-from src.generate_routes.graph_builder.data.tile_pointer import TilePointer
+from src.generate_routes.data.map_tile import MapTile
+from src.generate_routes.data.tile_pointer import TilePointer
 
 
 class TileLoader:

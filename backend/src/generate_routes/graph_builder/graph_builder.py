@@ -2,8 +2,7 @@ import networkx as nx
 import osmnx as ox
 
 from src.database.geo_point import GeoPoint
-from src.generate_routes.graph_builder.data.map import Map
-from src.generate_routes.graph_builder.graph_simplifier import GraphSimplifier
+from src.generate_routes.data.map import Map
 from src.generate_routes.graph_builder.tile_loader import TileLoader
 from src.generate_routes.graph_builder.tile_resolver import TileResolver
 
@@ -27,7 +26,7 @@ class GraphBuilder:
         closest_node = cls._calc_closest_node_id(merged_map, center)
         truncated_map = ox.truncate.truncate_graph_dist(merged_map, closest_node, radius)
 
-        return GraphSimplifier.simplify(truncated_map)
+        return truncated_map
 
     @staticmethod
     def _calc_closest_node_id(map: Map, center: GeoPoint) -> int:

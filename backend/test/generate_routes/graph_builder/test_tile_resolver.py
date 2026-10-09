@@ -3,7 +3,7 @@ from unittest.mock import patch
 import mercantile
 import pytest
 from src.database.geo_point import GeoPoint
-from src.generate_routes.graph_builder.data.tile_pointer import TilePointer
+from src.generate_routes.data.tile_pointer import TilePointer
 from src.generate_routes.graph_builder.tile_resolver import TileResolver
 
 

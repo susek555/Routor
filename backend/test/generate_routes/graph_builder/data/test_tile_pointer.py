@@ -2,7 +2,7 @@ from dataclasses import FrozenInstanceError
 
 import mercantile
 import pytest
-from src.generate_routes.graph_builder.data.tile_pointer import TilePointer
+from src.generate_routes.data.tile_pointer import TilePointer
 
 
 class TestTilePointer:
