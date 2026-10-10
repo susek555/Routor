@@ -99,26 +99,32 @@ class CheckpointsGenerator:
             raw_cloud_points.append((px, py))
 
         # ==========================================
-        # Step IX: Natural Angular Sweep Ordering
-        # Guarantees no self-intersections: sort points by polar angle
-        # relative to the center (start), beginning with the closest point.
+        # Step IX: Centroid-based Angular Sweep Ordering
+        # Prevents self-intersections and pinched returns by sorting all four
+        # vertices (start + 3 checkpoints) cyclically around their common centroid.
         # ==========================================
-        # 1. Polar angle of each point relative to center [ -pi, pi ]
-        def get_polar_angle(p: tuple[float, float]) -> float:
-            return math.atan2(p[1], p[0])
+        start_point_offset = (0.0, 0.0)
+        loop_vertices = [start_point_offset] + raw_cloud_points
 
-        # Sort ascending by angle around the center (forms a clean sweep/perimeter)
-        sorted_by_angle = sorted(raw_cloud_points, key=get_polar_angle)
+        # 1. Calculate common geometric centroid of the loop vertices
+        centroid_x = sum(p[0] for p in loop_vertices) / 4.0
+        centroid_y = sum(p[1] for p in loop_vertices) / 4.0
 
-        # 2. Pick the point closest to start as the first outbound leg
-        nearest_idx = min(range(3), key=lambda i: math.hypot(sorted_by_angle[i][0], sorted_by_angle[i][1]))
+        # 2. Sort all 4 vertices by polar angle around the centroid (counter-clockwise)
+        sorted_by_angle = sorted(
+            loop_vertices,
+            key=lambda p: math.atan2(p[1] - centroid_y, p[0] - centroid_x),
+        )
 
-        # Shift the list cyclically to start from the nearest point
-        ordered_points = [sorted_by_angle[(nearest_idx + i) % 3] for i in range(3)]
+        # 3. Cyclically align list to ensure start point (0, 0) remains at index 0
+        start_index = sorted_by_angle.index(start_point_offset)
+        ordered_cycle = [sorted_by_angle[(start_index + i) % 4] for i in range(4)]
 
-        # 3. Randomize loop direction: clockwise or counter-clockwise
-        # (reverse the remaining two points)
+        # 4. Randomize traversal orientation: keep counter-clockwise or reverse to clockwise
         if random.randint(0, 1) == 1:  # noqa: S311 not a cryptographic purpose
-            ordered_points = [ordered_points[0], ordered_points[2], ordered_points[1]]
+            ordered_cycle = [ordered_cycle[0], ordered_cycle[3], ordered_cycle[2], ordered_cycle[1]]
+
+        # Exclude the start point to return only the 3 sequential intermediate checkpoints
+        ordered_points = ordered_cycle[1:]
 
         return [cls._meters_to_geopoint(center, px, py) for px, py in ordered_points]

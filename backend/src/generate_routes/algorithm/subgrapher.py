@@ -27,14 +27,18 @@ class Subgrapher:
         graph: Map,
         start_point: GeoPoint,
         end_point: GeoPoint,
-        slack_ratio: float,
-        min_slack_meters: float,
+        base_lateral_slack_meters: float,
+        max_lateral_slack_meters: float,
     ) -> set[int]:
         """Extracts node IDs situated within the geometric elliptic corridor between two points."""
-        euclidean_distance = cls._haversine_distance(
+        focal_distance = cls._haversine_distance(
             start_point.latitude, start_point.longitude, end_point.latitude, end_point.longitude
         )
-        max_corridor_perimeter = (1.0 + slack_ratio) * euclidean_distance + min_slack_meters
+        c = focal_distance / 2.0
+
+        semi_minor_b = min(base_lateral_slack_meters + 0.06 * focal_distance, max_lateral_slack_meters)
+        semi_major_a = math.hypot(c, semi_minor_b)
+        max_corridor_perimeter = 2.0 * semi_major_a
 
         corridor_node_ids: set[int] = set()
         for node_id, node_attrs in graph.nodes(data=True):
@@ -51,65 +55,97 @@ class Subgrapher:
 
         return corridor_node_ids
 
+    @staticmethod
+    def _prune_dead_ends(graph: nx.Graph, protected_nodes: set[int]) -> nx.Graph:
+        """Iteratively removes dead-end nodes (degree <= 1), protecting essential nodes."""
+        pruned_graph = graph.copy()
+
+        while True:
+            dead_ends = [
+                node for node in pruned_graph.nodes if node not in protected_nodes and pruned_graph.degree(node) <= 1
+            ]
+
+            if not dead_ends:
+                break
+
+            pruned_graph.remove_nodes_from(dead_ends)
+
+        return pruned_graph
+
+    @classmethod
+    def _ensure_connected_nodes(
+        cls,
+        graph: Map,
+        stage_nodes: set[int],
+        source: int,
+        target: int,
+    ) -> set[int]:
+        """Guarantees at least one traversable path between source and target."""
+        stage_nodes.update((source, target))
+        if not nx.has_path(graph.subgraph(stage_nodes), source, target):
+            try:
+                fallback_path = nx.shortest_path(graph, source=source, target=target, weight="length")
+                stage_nodes.update(fallback_path)
+            except nx.NetworkXNoPath:
+                pass
+        return stage_nodes
+
+    @classmethod
+    def _build_stage_subgraph(
+        cls,
+        map: Map,
+        stage_nodes: set[int],
+        source_node: int | None,
+        target_node: int | None,
+    ) -> Map:
+        """Builds, connects, and prunes dead ends for a single stage corridor."""
+        if source_node is None or target_node is None:
+            return map.subgraph(stage_nodes).copy()
+
+        connected_nodes = cls._ensure_connected_nodes(map, stage_nodes, source_node, target_node)
+        subgraph: Map = map.subgraph(connected_nodes).copy()
+
+        if nx.has_path(subgraph, source_node, target_node):
+            try:
+                baseline_path = nx.shortest_path(subgraph, source=source_node, target=target_node, weight="length")
+                protected = set(baseline_path)
+            except nx.NetworkXNoPath:
+                protected = {source_node, target_node}
+            return cls._prune_dead_ends(subgraph, protected_nodes=protected)
+
+        return subgraph
+
     @classmethod
     def extract_subgraphs(
         cls,
         map: Map,
         checkpoints: list[GeoPoint],
         checkpoint_node_ids: list[int] | None = None,
-        slack_ratio: float = 0.30,
-        min_slack_meters: float = 150.0,
+        base_lateral_slack_meters: float = 160.0,
+        max_lateral_slack_meters: float = 320.0,
     ) -> list[Map]:
-        """
-        Slices the simplified graph into 4 sequential stage subgraphs along elliptic corridors.
-        Guarantees graph connectivity: if no route exists within the corridor (common in sparse rural areas),
-        it falls back to computing the global shortest path and adds its nodes to the stage subgraph.
-        """
+        """Slices the simplified graph into 4 sequential stage subgraphs along elliptic corridors."""
         EXPECTED_CHECKPOINT_COUNT = 4
 
         if len(checkpoints) != EXPECTED_CHECKPOINT_COUNT:
             return [map.copy()]
 
-        closed_checkpoints = list(checkpoints)
-        if checkpoints[0] != checkpoints[-1]:
-            closed_checkpoints.append(checkpoints[0])
-
-        closed_node_ids = None
-        if checkpoint_node_ids:
-            closed_node_ids = list(checkpoint_node_ids)
-            if checkpoint_node_ids[0] != checkpoint_node_ids[-1]:
-                closed_node_ids.append(checkpoint_node_ids[0])
+        pts = list(checkpoints) + [checkpoints[0]]
+        nodes = list(checkpoint_node_ids) + [checkpoint_node_ids[0]] if checkpoint_node_ids else None
 
         stage_subgraphs: list[Map] = []
-
-        for step_idx in range(len(closed_checkpoints) - 1):
-            start_point = closed_checkpoints[step_idx]
-            end_point = closed_checkpoints[step_idx + 1]
-
+        for i in range(len(pts) - 1):
             stage_nodes = cls._extract_corridor_nodes(
                 graph=map,
-                start_point=start_point,
-                end_point=end_point,
-                slack_ratio=slack_ratio,
-                min_slack_meters=min_slack_meters,
+                start_point=pts[i],
+                end_point=pts[i + 1],
+                base_lateral_slack_meters=base_lateral_slack_meters,
+                max_lateral_slack_meters=max_lateral_slack_meters,
             )
 
-            # Connectivity guarantee: append global fallback path if corridor is disconnected
-            if closed_node_ids is not None:
-                source_node = closed_node_ids[step_idx]
-                target_node = closed_node_ids[step_idx + 1]
-                stage_nodes.add(source_node)
-                stage_nodes.add(target_node)
+            src = nodes[i] if nodes else None
+            tgt = nodes[i + 1] if nodes else None
 
-                candidate_subgraph = map.subgraph(stage_nodes)
-                if not nx.has_path(candidate_subgraph, source_node, target_node):
-                    try:
-                        fallback_path = nx.shortest_path(map, source=source_node, target=target_node, weight="length")
-                        stage_nodes.update(fallback_path)
-                    except nx.NetworkXNoPath:
-                        pass
-
-            stage_subgraph: Map = map.subgraph(stage_nodes).copy()
-            stage_subgraphs.append(stage_subgraph)
+            stage_subgraphs.append(cls._build_stage_subgraph(map, stage_nodes, src, tgt))
 
         return stage_subgraphs
