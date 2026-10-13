@@ -16,7 +16,7 @@ from src.generate_routes.graph_builder.graph_converter import GraphConverter
 ESRI_SATELLITE = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
 ESRI_ATTR = "Esri World Imagery"
 
-# Distinct high-contrast palette for comparing 5 routes
+# Distinct color palette for 5 unique loop alternatives
 ROUTE_PALETTE = ["#00E5FF", "#FF0055", "#76FF03", "#FFD600", "#D500F9"]
 
 
@@ -33,13 +33,11 @@ def calculate_reconstructed_distance(points: list[GeoPoint]) -> float:
 def plot_routes_comparison_map(
     converter: GraphConverter,
     snapped_center: GeoPoint,
-    refined_checkpoints: list[GeoPoint],
-    routes: list[list[int]],
-    route_lengths: list[float],
+    routes_data: list[dict],
     target_distance: float,
     output_html: str,
 ):
-    """Renders Folium map comparing generated routes against waypoints and target distance."""
+    """Renders Folium map with 5 alternative ACO generated routes."""
     m = folium.Map(
         location=[snapped_center.latitude, snapped_center.longitude],
         zoom_start=13,
@@ -47,16 +45,30 @@ def plot_routes_comparison_map(
         attr=ESRI_ATTR,
     )
 
-    # 1. Plot each of the 5 ACO routes
-    for idx, (node_path, length) in enumerate(zip(routes, route_lengths, strict=True), start=1):
+    # Common Start Marker
+    start_layer = folium.FeatureGroup(name="Start Point", show=True)
+    folium.Marker(
+        [snapped_center.latitude, snapped_center.longitude],
+        popup=f"Start: ({snapped_center.latitude:.5f}, {snapped_center.longitude:.5f})",
+        icon=folium.Icon(color="green", icon="play"),
+    ).add_to(start_layer)
+    start_layer.add_to(m)
+
+    # Draw each route and its own checkpoints
+    for idx, item in enumerate(routes_data, start=1):
         color = ROUTE_PALETTE[(idx - 1) % len(ROUTE_PALETTE)]
+        length = item["length"]
+        node_path = item["path"]
+        refined_cps = item["refined_checkpoints"]
+
         diff_meters = length - target_distance
         diff_pct = (diff_meters / target_distance) * 100.0
         sign = "+" if diff_meters >= 0 else ""
 
-        layer_name = f"Route #{idx} | {length / 1000.0:.2f} km ({sign}{diff_meters:.0f} m / {sign}{diff_pct:.1f}%)"
-        route_layer = folium.FeatureGroup(name=layer_name, show=True)
+        layer_name = f"Trasa #{idx} | {length / 1000.0:.2f} km ({sign}{diff_meters:.0f} m / {sign}{diff_pct:.1f}%)"
+        route_group = folium.FeatureGroup(name=layer_name, show=True)
 
+        # 1. PolyLine of reconstructed curve
         reconstructed_pts = converter.reconstruct_route_from_node_ids(node_path)
         coords = [(p.latitude, p.longitude) for p in reconstructed_pts]
 
@@ -66,93 +78,44 @@ def plot_routes_comparison_map(
             weight=4,
             opacity=0.85,
             tooltip=layer_name,
-        ).add_to(route_layer)
+        ).add_to(route_group)
 
-        route_layer.add_to(m)
+        # 2. Refined Checkpoint markers for this route
+        for cp_idx, ref_p in enumerate(refined_cps, start=1):
+            folium.CircleMarker(
+                location=[ref_p.latitude, ref_p.longitude],
+                radius=5,
+                color="#FFFFFF",
+                weight=1.5,
+                fill=True,
+                fill_color=color,
+                fill_opacity=0.9,
+                tooltip=f"Trasa #{idx} - CP{cp_idx}",
+            ).add_to(route_group)
 
-    # 2. Checkpoints & Start marker layer
-    inspection_layer = folium.FeatureGroup(name="Waypoints (Start + CPs)", show=True)
-
-    folium.Marker(
-        [snapped_center.latitude, snapped_center.longitude],
-        popup=f"Start: ({snapped_center.latitude:.5f}, {snapped_center.longitude:.5f})",
-        icon=folium.Icon(color="green", icon="play"),
-    ).add_to(inspection_layer)
-
-    for idx, ref_p in enumerate(refined_checkpoints, start=1):
-        folium.CircleMarker(
-            location=[ref_p.latitude, ref_p.longitude],
-            radius=6,
-            color="#FFFFFF",
-            weight=2,
-            fill=True,
-            fill_color="#FF9800",
-            fill_opacity=1.0,
-            tooltip=f"Refined CP{idx}",
-        ).add_to(inspection_layer)
-
-    inspection_layer.add_to(m)
+        route_group.add_to(m)
 
     LayerControl(collapsed=False).add_to(m)
     m.save(output_html)
-    print(f"🗺 Comparison map saved to: {os.path.abspath(output_html)}")
+    print(f"\n🗺 Mapa porównawcza 5 tras zapisana do: {os.path.abspath(output_html)}")
 
 
 def main():
     center = GeoPoint(latitude=50.45, longitude=23.423)  # TL
-    # center = GeoPoint(latitude=52.23, longitude=21.00)    # WWA
+    # center = GeoPoint(latitude=52.23, longitude=21.00)  # WWA
     # center = GeoPoint(latitude=50.485, longitude=23.495)  # Justynowka
-    radius_meters = 5000.0
-    target_distance_meters = 2.0 * radius_meters / 0.7  # ~14.28 km target
+    radius_meters = 2500.0
+    target_distance_meters = 2.0 * radius_meters
 
-    print("1. Fetching raw OSM graph...")
+    print("1. Pobieranie surowego grafu OSM raz dla całego obszaru...")
     raw_graph = GraphBuilder.build_graph(center, radius_meters)
     if raw_graph is None or len(raw_graph.nodes) == 0:
-        print("❌ Graph is empty or failed to load.")
+        print("❌ Graf jest pusty.")
         return
 
-    print("2. Generating raw transit checkpoints...")
-    raw_checkpoints = CheckpointsGenerator.generate_checkpoints(center=center, radius=radius_meters)
-
-    print("3. Snapping points on RAW graph (filtering out highway='service')...")
     snapper = Snapper(raw_map=raw_graph)
     start_node_id, snapped_center = snapper.snap_point(center)
-    snapped_pairs = snapper.snap_points(raw_checkpoints)
-
-    snapped_node_ids = [start_node_id] + [node_id for node_id, _ in snapped_pairs]
-    snapped_checkpoints = [pt for _, pt in snapped_pairs]
-
-    print("4. Simplifying graph while protecting snapped transit nodes...")
-    converter = GraphConverter(original_map=raw_graph)
-    simple_graph = converter.convert_graph_to_algorithm(protected_nodes=set(snapped_node_ids))
-
-    print("5. Slicing graph into stage corridor subgraphs...")
-    points_chain = [snapped_center] + snapped_checkpoints
-    stage_subgraphs = Subgrapher.extract_subgraphs(
-        map=simple_graph,
-        checkpoints=points_chain,
-        checkpoint_node_ids=snapped_node_ids,
-        base_lateral_slack_meters=160.0,
-        max_lateral_slack_meters=320.0,
-    )
-
-    print("6. Refining checkpoints within stage subgraphs (collapsing spurs to forks)...")
-    refined_node_ids, stage_subgraphs = CheckpointRefiner.refine_stage_checkpoints(
-        stage_subgraphs=stage_subgraphs,
-        checkpoint_node_ids=snapped_node_ids,
-        target_distance_meters=target_distance_meters,
-        max_retraction_ratio=0.12,
-    )
-
-    refined_checkpoints: list[GeoPoint] = []
-    for node_id in refined_node_ids[1:]:
-        node_data = simple_graph.nodes[node_id]
-        lat = node_data.get("y", node_data.get("lat"))
-        lon = node_data.get("x", node_data.get("lon"))
-        refined_checkpoints.append(GeoPoint(latitude=lat, longitude=lon))
-
-    print(f"\n🎯 Target distance: {target_distance_meters / 1000.0:.2f} km ({target_distance_meters:.0f} m)")
-    print("7. Running 5 independent ACO runs for comparison...")
+    print(f"   -> Start snap: node {start_node_id} ({snapped_center.latitude:.5f}, {snapped_center.longitude:.5f})")
 
     aco_params = ACOParams(
         num_ants=25,
@@ -162,20 +125,63 @@ def main():
         evaporation_rate=0.15,
         initial_pheromone=1.0,
         target_distance=target_distance_meters,
-        fitness_alpha=2.5,
-        fitness_beta=3.0,
+        fitness_alpha=1.5,
+        fitness_beta=20.0,
     )
 
-    generated_routes: list[list[int]] = []
-    generated_lengths: list[float] = []
+    routes_data = []
+    converter = None
 
-    for run_idx in range(1, 6):
+    print(f"\n🎯 Docelowy dystans: {target_distance_meters / 1000.0:.2f} km ({target_distance_meters:.0f} m)")
+    print("================================================================================")
+
+    for route_idx in range(1, 6):
+        print(f"\n--- Generowanie Wariantu Trasy #{route_idx}/5 ---")
+
+        # 1. Losowanie nowego szkieletu punktów kontrolnych (inny obrót / układ)
+        raw_checkpoints = CheckpointsGenerator.generate_checkpoints(center=center, radius=radius_meters)
+        snapped_pairs = snapper.snap_points(raw_checkpoints)
+
+        snapped_node_ids = [start_node_id] + [node_id for node_id, _ in snapped_pairs]
+        snapped_checkpoints = [pt for _, pt in snapped_pairs]
+
+        # 2. Uproszczenie topologiczne z zabezpieczeniem węzłów bieżącej trasy
+        converter = GraphConverter(original_map=raw_graph)
+        simple_graph = converter.convert_graph_to_algorithm(protected_nodes=set(snapped_node_ids))
+
+        # 3. Wycięcie korytarzy etapowych
+        points_chain = [snapped_center] + snapped_checkpoints
+        stage_subgraphs = Subgrapher.extract_subgraphs(
+            map=simple_graph,
+            checkpoints=points_chain,
+            checkpoint_node_ids=snapped_node_ids,
+            base_lateral_slack_meters=160.0,
+            max_lateral_slack_meters=320.0,
+        )
+
+        # 4. Zwijanie wybiegów / agrafek
+        refined_node_ids, stage_subgraphs = CheckpointRefiner.refine_stage_checkpoints(
+            stage_subgraphs=stage_subgraphs,
+            checkpoint_node_ids=snapped_node_ids,
+            target_distance_meters=target_distance_meters,
+            max_retraction_ratio=0.25,
+        )
+
+        refined_checkpoints = []
+        for node_id in refined_node_ids[1:]:
+            node_data = simple_graph.nodes[node_id]
+            lat = node_data.get("y", node_data.get("lat"))
+            lon = node_data.get("x", node_data.get("lon"))
+            refined_checkpoints.append(GeoPoint(latitude=lat, longitude=lon))
+
+        # 5. Uruchomienie ACO na wyciętych podgrafach
         aco = ACO(
             params=aco_params,
             checkpoints=refined_node_ids,
             stage_graphs=stage_subgraphs,
         )
-        route_nodes = aco.generate_route()
+        route_nodes, route_fitness = aco.generate_route()
+
         reconstructed_pts = converter.reconstruct_route_from_node_ids(route_nodes)
         actual_distance = calculate_reconstructed_distance(reconstructed_pts)
 
@@ -183,21 +189,26 @@ def main():
         diff_pct = (diff / target_distance_meters) * 100.0
         sign = "+" if diff >= 0 else ""
 
-        generated_routes.append(route_nodes)
-        generated_lengths.append(actual_distance)
-
         print(
-            f"   -> Run #{run_idx}: {actual_distance / 1000.0:.2f} km "
-            f"({sign}{diff:.0f} m | {sign}{diff_pct:.1f}%) | Nodes: {len(route_nodes)}"
+            f"✅ Wariant #{route_idx}: {actual_distance / 1000.0:.2f} km "
+            f"({sign}{diff:.0f} m | {sign}{diff_pct:.1f}%) | Węzłów: {len(route_nodes)}"
+            f" | Fitness: {route_fitness:.4f}"
         )
 
-    output_html = "test_aco_comparison_result.html"
+        routes_data.append(
+            {
+                "path": route_nodes,
+                "length": actual_distance,
+                "refined_checkpoints": refined_checkpoints,
+            }
+        )
+
+    # Wizualizacja wszystkich 5 tras na jednej mapie
+    output_html = "test_5_different_routes_comparison.html"
     plot_routes_comparison_map(
         converter=converter,
         snapped_center=snapped_center,
-        refined_checkpoints=refined_checkpoints,
-        routes=generated_routes,
-        route_lengths=generated_lengths,
+        routes_data=routes_data,
         target_distance=target_distance_meters,
         output_html=output_html,
     )

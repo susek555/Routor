@@ -1,9 +1,56 @@
+from dataclasses import dataclass, field
+
 import networkx as nx
 import numpy as np
+
 from src.generate_routes.algorithm.aco.edge_pheromone_registry import EdgePheromoneRegistry
 from src.generate_routes.algorithm.aco.heuristics import BudgetManager
-from src.generate_routes.algorithm.aco.utils import get_min_edge_length
-from src.generate_routes.data.map import Map
+from src.generate_routes.algorithm.aco.utils import get_min_edge_length, get_node_coords, haversine
+
+type Map = nx.MultiDiGraph
+
+# Fast bounding-box angular thresholds (~25m in Poland's latitude)
+DEG_LAT_25M = 0.00023
+DEG_LON_25M = 0.00036
+
+# Maximum step multiplier and baseline floor for the traversal loop
+STEP_LIMIT_NODE_MULTIPLIER = 2
+MIN_STEP_LIMIT_FLOOR = 80
+
+# Minimum coordinate history length required to check for parallel corridor overlaps
+MIN_HISTORY_FOR_PROXIMITY = 3
+HISTORY_RECENCY_EXCLUSION_OFFSET = 3
+
+# Destination approach zone parameters
+APPROACH_ZONE_RADIUS_METERS = 350.0
+
+# Soft corridor taboo penalty applied during roulette wheel evaluation
+NEAR_CORRIDOR_ETA_PENALTY = 0.05
+MIN_PROBABILITY_EPSILON = 1e-9
+
+
+@dataclass
+class WalkerParams:
+    """Hyperparameters configuring walker behavior and sensitivities."""
+
+    alpha: float
+    beta: float
+    proximity_dist: float = 25.0
+
+
+@dataclass
+class AntState:
+    """Internal mutable backtracking stacks and history for a traversing ant."""
+
+    current: int
+    dest: int
+    path: list[int] = field(default_factory=list)
+    stage_edges: list[frozenset[int]] = field(default_factory=list)
+    edge_lengths: list[float] = field(default_factory=list)
+    visited_edges: set[frozenset[int]] = field(default_factory=set)
+    dead_end_nodes: set[int] = field(default_factory=set)
+    past_coords: list[tuple[float, float]] = field(default_factory=list)
+    distance: float = 0.0
 
 
 class StageWalker:
@@ -13,112 +60,176 @@ class StageWalker:
         self,
         pheromone_registry: EdgePheromoneRegistry,
         budget_manager: BudgetManager,
-        alpha: float,
-        beta: float,
+        params: WalkerParams,
     ):
         self.registry = pheromone_registry
         self.budget_manager = budget_manager
-        self.alpha = alpha
-        self.beta = beta
+        self.params = params
 
-    def _dijkstra_fallback(
+    def _emergency_dijkstra(self, graph: Map, current: int, dest: int) -> list[int]:
+        """Ultimate fallback only if topological connectivity is completely lost."""
+        try:
+            path = nx.shortest_path(graph, source=current, target=dest, weight="length")
+            return path[1:]
+        except (nx.NetworkXNoPath, nx.NodeNotFound):
+            return []
+
+    def _is_parallel_corridor(
+        self,
+        coord_v: tuple[float, float],
+        past_coords: list[tuple[float, float]],
+    ) -> bool:
+        """Determines if a target coordinate lies within a previously visited corridor."""
+        if len(past_coords) <= MIN_HISTORY_FOR_PROXIMITY:
+            return False
+
+        lat_v, lon_v = coord_v
+        history_slice = past_coords[:-HISTORY_RECENCY_EXCLUSION_OFFSET]
+        for lat_p, lon_p in history_slice:
+            if abs(lat_v - lat_p) < DEG_LAT_25M and abs(lon_v - lon_p) < DEG_LON_25M:
+                if haversine((lat_v, lon_v), (lat_p, lon_p)) < self.params.proximity_dist:
+                    return True
+        return False
+
+    def _is_legal_move(
+        self,
+        candidate: int,
+        state: AntState,
+        coord_v: tuple[float, float],
+    ) -> bool:
+        """Evaluates whether moving from state.current to candidate node is legally allowed."""
+        if candidate == state.current or candidate in state.dead_end_nodes:
+            return False
+        if len(state.path) > 1 and candidate == state.path[-2]:
+            return False
+        if frozenset((state.current, candidate)) in state.visited_edges:
+            return False
+        return not self._is_parallel_corridor(coord_v, state.past_coords)
+
+    def _filter_valid_moves(
         self,
         graph: Map,
-        current: int,
-        dest: int,
-        visited_edges: set[frozenset[int]],
+        state: AntState,
+        node_coords: dict[int, tuple[float, float]],
     ) -> list[int]:
-        """Recovers when ant is trapped by dead-ends or taboo constraints."""
+        """Collects legal successor moves and applies the anti-meandering approach constraint."""
+        valid_moves = [v for v in graph.successors(state.current) if self._is_legal_move(v, state, node_coords[v])]
 
-        def penalized_weight(u: int, v: int, _: dict) -> float:
-            base_len = get_min_edge_length(graph, u, v)
-            return base_len * 50.0 if frozenset((u, v)) in visited_edges else base_len
+        # Enforce direct approach to destination when within the final perimeter
+        dist_to_dest = haversine(node_coords[state.current], node_coords[state.dest])
+        if dist_to_dest < APPROACH_ZONE_RADIUS_METERS:
+            progress_moves = [
+                v for v in valid_moves if haversine(node_coords[v], node_coords[state.dest]) < dist_to_dest
+            ]
+            if progress_moves:
+                return progress_moves
 
-        try:
-            path = nx.shortest_path(graph, source=current, target=dest, weight=penalized_weight)
-            return path[1:]
-        except nx.NetworkXNoPath:
-            return []
+        return valid_moves
+
+    def _handle_dead_end_rollback(self, graph: Map, state: AntState) -> bool:
+        """Backtracks from a dead end or executes emergency Dijkstra if back-routing fails.
+
+        Returns:
+            True if the traversal loop must terminate immediately, False to continue.
+        """
+        state.dead_end_nodes.add(state.current)
+        if len(state.path) > 1:
+            state.path.pop()
+            if state.stage_edges:
+                state.stage_edges.pop()
+            if state.edge_lengths:
+                state.distance -= state.edge_lengths.pop()
+            if state.past_coords:
+                state.past_coords.pop()
+            state.current = state.path[-1]
+            return False
+
+        fallback = self._emergency_dijkstra(graph, state.current, state.dest)
+        for nxt in fallback:
+            state.path.append(nxt)
+            state.stage_edges.append(frozenset((state.current, nxt)))
+            e_len = get_min_edge_length(graph, state.current, nxt)
+            state.distance += e_len
+            state.edge_lengths.append(e_len)
+            state.current = nxt
+
+        return True
+
+    def _select_next_node(
+        self,
+        stage_idx: int,
+        valid_moves: list[int],
+        state: AntState,
+        budget_ratio_r: float,
+    ) -> int:
+        """Selects the next node via ACO roulette wheel sampling."""
+        probs: list[float] = []
+
+        for v in valid_moves:
+            tau = self.registry.get_pheromone(state.current, v) ** self.params.alpha
+            eta = self.budget_manager.calculate_eta(stage_idx, state.current, v, budget_ratio_r) ** self.params.beta
+
+            coords_v = get_node_coords(self.budget_manager.stage_graphs[stage_idx], v)
+            if self._is_parallel_corridor(coords_v, state.past_coords):
+                eta *= NEAR_CORRIDOR_ETA_PENALTY
+
+            probs.append(max(tau * eta, MIN_PROBABILITY_EPSILON))
+
+        total_p = sum(probs)
+        norm_probs = [p / total_p for p in probs]
+        chosen_idx = int(np.random.choice(len(valid_moves), p=norm_probs))
+        return valid_moves[chosen_idx]
+
+    def _advance_ant(
+        self,
+        graph: Map,
+        next_node: int,
+        state: AntState,
+        coord_next: tuple[float, float],
+    ) -> None:
+        """Advances ant state forward to the next chosen node."""
+        edge_key = frozenset((state.current, next_node))
+        e_len = get_min_edge_length(graph, state.current, next_node)
+
+        state.path.append(next_node)
+        state.stage_edges.append(edge_key)
+        state.edge_lengths.append(e_len)
+        state.distance += e_len
+        state.visited_edges.add(edge_key)
+        state.past_coords.append(coord_next)
+        state.current = next_node
 
     def walk_stage(
         self,
         stage_idx: int,
-        start_node: int,
-        dest_node: int,
         effective_budget: float,
+        state: AntState,
     ) -> tuple[list[int], list[frozenset[int]], float]:
-        """Traverses a single stage from start_node to dest_node.
-
-        Returns:
-            path: list of visited node IDs.
-            edges: list of traversed undirected edge keys in order.
-            total_dist: accumulated distance in meters for this stage.
-        """
+        """Executes ant traversal through a single stage using heuristics and backtracking."""
         graph = self.budget_manager.stage_graphs[stage_idx]
-        current = start_node
-        path = [current]
-        stage_edges: list[frozenset[int]] = []
-        visited_stage_edges: set[frozenset[int]] = set()
-        stage_dist = 0.0
+        node_coords = {n: get_node_coords(graph, n) for n in graph.nodes()}
 
-        max_steps = max(len(graph.nodes) * 2, 50)
+        max_steps = max(len(graph.nodes) * STEP_LIMIT_NODE_MULTIPLIER, MIN_STEP_LIMIT_FLOOR)
         steps = 0
 
-        while current != dest_node and steps < max_steps:
+        while state.current != state.dest and steps < max_steps:
             steps += 1
-            neighbors = list(graph.successors(current))
+
             r = self.budget_manager.calculate_r(
                 stage_idx=stage_idx,
-                current_node=current,
+                current_node=state.current,
                 effective_budget=effective_budget,
-                dist_done_in_stage=stage_dist,
+                dist_done_in_stage=state.distance,
             )
 
-            # Filter valid candidate nodes
-            valid_moves = []
-            for v in neighbors:
-                edge_key = frozenset((current, v))
-                # Prevent immediate u-turn (u -> v -> u)
-                if len(path) > 1 and v == path[-2]:
-                    continue
-                # Stage-level edge taboo
-                if edge_key in visited_stage_edges:
-                    continue
-                valid_moves.append(v)
+            valid_moves = self._filter_valid_moves(graph, state, node_coords)
 
-            # Dead-end recovery via Dijkstra fallback
             if not valid_moves:
-                fallback_path = self._dijkstra_fallback(graph, current, dest_node, visited_stage_edges)
-                if not fallback_path:
+                if self._handle_dead_end_rollback(graph, state):
                     break
-                for next_node in fallback_path:
-                    edge_key = frozenset((current, next_node))
-                    e_len = get_min_edge_length(graph, current, next_node)
-                    stage_dist += e_len
-                    path.append(next_node)
-                    stage_edges.append(edge_key)
-                    visited_stage_edges.add(edge_key)
-                    current = next_node
-                break
+                continue
 
-            # Calculate transition probabilities
-            probs = []
-            for v in valid_moves:
-                tau = self.registry.get_pheromone(current, v) ** self.alpha
-                eta = self.budget_manager.calculate_eta(stage_idx, current, v, r) ** self.beta
-                probs.append(max(tau * eta, 1e-9))
+            next_node = self._select_next_node(stage_idx, valid_moves, state, r)
+            self._advance_ant(graph, next_node, state, node_coords[next_node])
 
-            total_p = sum(probs)
-            norm_probs = [p / total_p for p in probs]
-            chosen_idx = np.random.choice(len(valid_moves), p=norm_probs)
-            next_node = valid_moves[chosen_idx]
-
-            edge_key = frozenset((current, next_node))
-            e_len = get_min_edge_length(graph, current, next_node)
-            stage_dist += e_len
-            path.append(next_node)
-            stage_edges.append(edge_key)
-            visited_stage_edges.add(edge_key)
-            current = next_node
-
-        return path, stage_edges, stage_dist
+        return state.path, state.stage_edges, state.distance

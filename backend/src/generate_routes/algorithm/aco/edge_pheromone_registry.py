@@ -23,15 +23,22 @@ class EdgePheromoneRegistry:
         # 1D pheromone array of length M
         self.pheromones: np.ndarray = np.full(len(self.id_to_edge), self.initial_pheromone, dtype=np.float32)
 
-    def get_edge_id(self, u: int, v: int | None = None) -> int:
-        """Returns the flat index for undirected edge {u, v} or frozenset."""
+    def get_edge_id(self, u: int | frozenset[int], v: int | None = None) -> int | None:
+        """Returns the flat index for undirected edge {u, v} or frozenset. Returns None if invalid."""
         if isinstance(u, frozenset):
             key = u
         elif v is not None:
             key = frozenset((u, v))
         else:
-            raise ValueError("Must provide either a frozenset or both u and v.")
-        return self.edge_to_id.get(key, 0)
+            return None
+
+
+        # Ignore self-loops (u == v)
+        EDGE_LEN = 2
+        if len(key) < EDGE_LEN:
+            return None
+
+        return self.edge_to_id.get(key)
 
     def get_pheromone(self, u: int, v: int) -> float:
         """Retrieves the current pheromone level for edge {u, v}."""
