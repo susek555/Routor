@@ -157,8 +157,8 @@ def plot_pipeline_map(
 
 def main():
     # center = GeoPoint(latitude=50.45, longitude=23.423)   # TL
-    # center = GeoPoint(latitude=52.23, longitude=21.00)    # WWA
-    center = GeoPoint(latitude=50.485, longitude=23.495)    # Justynowka
+    center = GeoPoint(latitude=52.23, longitude=21.00)    # WWA
+    # center = GeoPoint(latitude=50.485, longitude=23.495)    # Justynowka
     radius_meters = 5000.0
     target_distance_meters = 2.0 * radius_meters / 0.7
 
@@ -188,11 +188,11 @@ def main():
     print("5. Slicing graph into stage corridor subgraphs (wide envelopes)...")
     points_chain = [snapped_center] + snapped_checkpoints
     stage_subgraphs = Subgrapher.extract_subgraphs(
-        map=simple_graph,
+        map_graph=simple_graph,
         checkpoints=points_chain,
         checkpoint_node_ids=snapped_node_ids,
-        base_lateral_slack_meters=160.0,
-        max_lateral_slack_meters=320.0,
+        base_lateral_slack=160.0,
+        max_lateral_slack=320.0,
     )
 
     print("6. Refining checkpoints within stage subgraphs (collapsing spurs to forks)...")

@@ -9,23 +9,27 @@ from src.generate_routes.algorithm.aco.utils import get_min_edge_length, get_nod
 
 type Map = nx.MultiDiGraph
 
-# Fast bounding-box angular thresholds (~25m in Poland's latitude)
-DEG_LAT_25M = 0.00023
-DEG_LON_25M = 0.00036
+# Bounding-box angular thresholds for Poland's coordinates (~60m wide boundary)
+DEG_LAT_60M = 0.00055
+DEG_LON_60M = 0.00085
 
-# Maximum step multiplier and baseline floor for the traversal loop
+# Step limits
 STEP_LIMIT_NODE_MULTIPLIER = 2
 MIN_STEP_LIMIT_FLOOR = 80
 
-# Minimum coordinate history length required to check for parallel corridor overlaps
+# Trajectory history offsets
 MIN_HISTORY_FOR_PROXIMITY = 3
 HISTORY_RECENCY_EXCLUSION_OFFSET = 3
 
-# Destination approach zone parameters
-APPROACH_ZONE_RADIUS_METERS = 350.0
+# Spatial corridor thresholds
+HARD_CORRIDOR_DIST_METERS = 25.0
+SOFT_CORRIDOR_DIST_METERS = 40.0
 
-# Soft corridor taboo penalty applied during roulette wheel evaluation
-NEAR_CORRIDOR_ETA_PENALTY = 0.05
+# Approach zone to checkpoints
+APPROACH_ZONE_RADIUS_METERS = 100.0
+
+# Probabilistic penalties
+SOFT_CORRIDOR_ETA_PENALTY = 0.25
 MIN_PROBABILITY_EPSILON = 1e-9
 
 
@@ -35,7 +39,8 @@ class WalkerParams:
 
     alpha: float
     beta: float
-    proximity_dist: float = 25.0
+    hard_proximity_dist: float = HARD_CORRIDOR_DIST_METERS
+    soft_proximity_dist: float = SOFT_CORRIDOR_DIST_METERS
 
 
 @dataclass
@@ -74,20 +79,21 @@ class StageWalker:
         except (nx.NetworkXNoPath, nx.NodeNotFound):
             return []
 
-    def _is_parallel_corridor(
+    def _check_corridor_overlap(
         self,
         coord_v: tuple[float, float],
         past_coords: list[tuple[float, float]],
+        threshold_dist: float,
     ) -> bool:
-        """Determines if a target coordinate lies within a previously visited corridor."""
+        """Checks if coordinate v is within threshold_dist of past trajectory."""
         if len(past_coords) <= MIN_HISTORY_FOR_PROXIMITY:
             return False
 
         lat_v, lon_v = coord_v
         history_slice = past_coords[:-HISTORY_RECENCY_EXCLUSION_OFFSET]
         for lat_p, lon_p in history_slice:
-            if abs(lat_v - lat_p) < DEG_LAT_25M and abs(lon_v - lon_p) < DEG_LON_25M:
-                if haversine((lat_v, lon_v), (lat_p, lon_p)) < self.params.proximity_dist:
+            if abs(lat_v - lat_p) < DEG_LAT_60M and abs(lon_v - lon_p) < DEG_LON_60M:
+                if haversine((lat_v, lon_v), (lat_p, lon_p)) < threshold_dist:
                     return True
         return False
 
@@ -97,14 +103,14 @@ class StageWalker:
         state: AntState,
         coord_v: tuple[float, float],
     ) -> bool:
-        """Evaluates whether moving from state.current to candidate node is legally allowed."""
+        """Evaluates whether moving to candidate is allowed (hard taboo constraints)."""
         if candidate == state.current or candidate in state.dead_end_nodes:
             return False
         if len(state.path) > 1 and candidate == state.path[-2]:
             return False
         if frozenset((state.current, candidate)) in state.visited_edges:
             return False
-        return not self._is_parallel_corridor(coord_v, state.past_coords)
+        return not self._check_corridor_overlap(coord_v, state.past_coords, self.params.hard_proximity_dist)
 
     def _filter_valid_moves(
         self,
@@ -112,10 +118,9 @@ class StageWalker:
         state: AntState,
         node_coords: dict[int, tuple[float, float]],
     ) -> list[int]:
-        """Collects legal successor moves and applies the anti-meandering approach constraint."""
+        """Collects legal successor moves and enforces approach when near destination."""
         valid_moves = [v for v in graph.successors(state.current) if self._is_legal_move(v, state, node_coords[v])]
 
-        # Enforce direct approach to destination when within the final perimeter
         dist_to_dest = haversine(node_coords[state.current], node_coords[state.dest])
         if dist_to_dest < APPROACH_ZONE_RADIUS_METERS:
             progress_moves = [
@@ -127,11 +132,7 @@ class StageWalker:
         return valid_moves
 
     def _handle_dead_end_rollback(self, graph: Map, state: AntState) -> bool:
-        """Backtracks from a dead end or executes emergency Dijkstra if back-routing fails.
-
-        Returns:
-            True if the traversal loop must terminate immediately, False to continue.
-        """
+        """Backtracks from dead ends or runs emergency Dijkstra."""
         state.dead_end_nodes.add(state.current)
         if len(state.path) > 1:
             state.path.pop()
@@ -162,16 +163,21 @@ class StageWalker:
         state: AntState,
         budget_ratio_r: float,
     ) -> int:
-        """Selects the next node via ACO roulette wheel sampling."""
+        """Selects next node via ACO roulette wheel applying smooth turn and soft corridor penalties."""
         probs: list[float] = []
+        prev_node = state.path[-2] if len(state.path) > 1 else None
 
         for v in valid_moves:
             tau = self.registry.get_pheromone(state.current, v) ** self.params.alpha
-            eta = self.budget_manager.calculate_eta(stage_idx, state.current, v, budget_ratio_r) ** self.params.beta
+            eta = (
+                self.budget_manager.calculate_eta(stage_idx, state.current, v, budget_ratio_r, prev_node)
+                ** self.params.beta
+            )
 
             coords_v = get_node_coords(self.budget_manager.stage_graphs[stage_idx], v)
-            if self._is_parallel_corridor(coords_v, state.past_coords):
-                eta *= NEAR_CORRIDOR_ETA_PENALTY
+            # Soft taboo: penalty for running alongside recent parallel corridors (25m - 60m)
+            if self._check_corridor_overlap(coords_v, state.past_coords, self.params.soft_proximity_dist):
+                eta *= SOFT_CORRIDOR_ETA_PENALTY
 
             probs.append(max(tau * eta, MIN_PROBABILITY_EPSILON))
 
