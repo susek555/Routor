@@ -8,18 +8,11 @@ from src.database.geo_point import GeoPoint
 from src.generate_routes.algorithm.aco.aco import ACO
 from src.generate_routes.algorithm.aco.aco_params import ACOParams
 from src.generate_routes.algorithm.aco.evaluator import (
-    ANTIPARALLEL_MIN_RAD,
-    DEG_LAT,
-    DEG_LON,
-    MIN_PATH_NODES_FOR_OVERLAP,
-    MIN_PATH_SEPARATION_METERS,
-    OPPOSITE_CORRIDOR_PENALTY_MULTIPLIER,
-    OUT_AND_BACK_PENALTY_MULTIPLIER,
-    START_FINISH_EXCLUSION_RADIUS_METERS,
     RouteEvaluator,
     _get_heading_rad,
 )
-from src.generate_routes.algorithm.aco.utils import haversine
+from src.generate_routes.algorithm.aco.utils.common import haversine
+from src.generate_routes.algorithm.aco.utils.evaluator import BoundingBoxEnum, EvaluatorParams
 from src.generate_routes.algorithm.checkpoint_refiner import CheckpointRefiner
 from src.generate_routes.algorithm.checkpoints_generator import CheckpointsGenerator
 from src.generate_routes.algorithm.snapper import Snapper
@@ -36,7 +29,7 @@ ROUTE_PALETTE = ["#00E5FF", "#FF0055", "#76FF03", "#FFD600", "#D500F9"]
 
 
 def create_base_map(center: GeoPoint, zoom: int = 14) -> folium.Map:
-    """Tworzy bazową mapę z poprawnie skonfigurowaną warstwą satelitarną Esri i OSM."""
+    """Tworzy bazową mapę z warstwą satelitarną Esri i OSM."""
     m = folium.Map(
         location=[center.latitude, center.longitude],
         zoom_start=zoom,
@@ -136,24 +129,25 @@ def plot_routes_comparison_map(
 def visualize_all_routes_overlaps(
     snapped_center: GeoPoint,
     routes_data: list[dict],
+    evaluator_params: EvaluatorParams,
     output_html_path: str = "routes_overlap_comparison.html",
 ) -> None:
-    """Generuje wspólną mapę Folium dla wszystkich tras z diagnostyką overlapów
-
-    używając próbek, testu prostopadłości korytarza, separacji wzdłuż trasy (>=90m)
-    oraz pełnego wykluczenia strefy Start/Meta (150m) dla nawrotów i korytarzy.
-    """
+    """Generuje wspólną mapę Folium dla wszystkich tras, czytając parametry bezpośrednio z EvaluatorParams."""
     debug_map = create_base_map(snapped_center, zoom=14)
 
-    # Strefa ochronna Start/Meta
+    # 1. Strefa wyłączenia Start/Meta z konfiguracji
+    exclusion_radius = evaluator_params.start_finish_exclusion_radius_meters
+    deg_lat = evaluator_params.bounding_box.DEG_LAT
+    deg_lon = evaluator_params.bounding_box.DEG_LON
+
     zone_layer = folium.FeatureGroup(name="Strefa Start/Meta (Ochronna)", show=True)
     folium.Circle(
         location=[snapped_center.latitude, snapped_center.longitude],
-        radius=START_FINISH_EXCLUSION_RADIUS_METERS,
+        radius=exclusion_radius,
         color="#28a745",
         fill=True,
         fill_opacity=0.2,
-        tooltip=f"Start/Finish Protected Exclusion Zone ({START_FINISH_EXCLUSION_RADIUS_METERS:.0f}m)",
+        tooltip=f"Start/Finish Protected Exclusion Zone ({exclusion_radius:.0f}m)",
     ).add_to(zone_layer)
     folium.Marker(
         [snapped_center.latitude, snapped_center.longitude],
@@ -171,7 +165,7 @@ def visualize_all_routes_overlaps(
         evaluator: RouteEvaluator = item["evaluator"]
         color = ROUTE_PALETTE[(idx - 1) % len(ROUTE_PALETTE)]
 
-        if len(full_path) < MIN_PATH_NODES_FOR_OVERLAP:
+        if len(full_path) < evaluator_params.min_path_nodes_to_overlap:
             continue
 
         route_group = folium.FeatureGroup(name=f"Nakładania - Trasa #{idx}", show=(idx == 1))
@@ -191,7 +185,6 @@ def visualize_all_routes_overlaps(
         ).add_to(route_group)
 
         visited_edges: set[frozenset[int]] = set()
-        # Format historii identyczny jak w RouteEvaluator: (punkt, azymut, dystans_trasy, czy_w_strefie_start)
         history: list[tuple[tuple[float, float], float, float, bool]] = []
         current_cumulative_dist = 0.0
 
@@ -210,10 +203,9 @@ def visualize_all_routes_overlaps(
             c_v = evaluator.node_coord_cache.get(v, (0.0, 0.0))
             curr_heading = _get_heading_rad(c_u, c_v)
 
-            # Sprawdzenie, czy krawędź dotyka strefy ochronnej
             is_edge_protected = any(evaluator._is_near_start_finish(pt, start_coord) for pt in samples)
 
-            # 1. Bezwzględne powtórzenie topologiczne (tylko poza strefą ochronną)
+            # 1. Bezwzględne powtórzenie topologiczne
             if edge_key in visited_edges:
                 if not is_edge_protected:
                     out_and_back_count += 1
@@ -229,11 +221,11 @@ def visualize_all_routes_overlaps(
                             f"<b>TRASA #{idx} - OUT-AND-BACK</b><br>"
                             f"Krok: {i}<br>Krawędź: ({u}, {v})<br>"
                             f"Długość: {edge_len:.1f}m<br>"
-                            f"Kara: {OUT_AND_BACK_PENALTY_MULTIPLIER}x"
+                            f"Kara: {evaluator_params.out_and_back_penalty_multiplier}x"
                         ),
                     ).add_to(route_group)
             else:
-                # 2. Przeciwbieżny korytarz z testem kątowym i geometrycznym
+                # 2. Przeciwbieżny korytarz
                 if not is_edge_protected:
                     conflict_found = False
                     for pt in samples:
@@ -242,23 +234,20 @@ def visualize_all_routes_overlaps(
 
                         lat_m, lon_m = pt
                         for (prev_lat, prev_lon), prev_heading, prev_cum_dist, prev_in_zone in history:
-                            # Ignoruj punkty z historii należące do strefy ochronnej
                             if prev_in_zone:
                                 continue
 
-                            # Odległość wzdłuż trasy (ochrona przed narożnikami)
-                            if (current_cumulative_dist - prev_cum_dist) < MIN_PATH_SEPARATION_METERS:
+                            if (current_cumulative_dist - prev_cum_dist) < evaluator_params.min_path_separation_meters:
                                 continue
 
-                            if abs(lat_m - prev_lat) < DEG_LAT and abs(lon_m - prev_lon) < DEG_LON:
+                            if abs(lat_m - prev_lat) < deg_lat and abs(lon_m - prev_lon) < deg_lon:
                                 dist = haversine(pt, (prev_lat, prev_lon))
-                                if dist < evaluator.corridor_threshold:
+                                if dist < evaluator_params.default_corridor_threshold_meters:
                                     delta_heading = abs(curr_heading - prev_heading)
                                     if delta_heading > math.pi:
                                         delta_heading = 2.0 * math.pi - delta_heading
 
-                                    # Zwrot przeciwny (>= 140 stopni)
-                                    if delta_heading >= ANTIPARALLEL_MIN_RAD:
+                                    if delta_heading >= evaluator_params.antiparallel_min_rad:
                                         if evaluator._is_perpendicular_corridor(pt, (prev_lat, prev_lon), curr_heading):
                                             opposite_count += 1
                                             folium.CircleMarker(
@@ -272,9 +261,9 @@ def visualize_all_routes_overlaps(
                                                     f"<b>TRASA #{idx} - OPPOSITE CORRIDOR</b><br>"
                                                     f"Krok: {i}<br>"
                                                     f"Separacja wzdłuż trasy: {current_cumulative_dist - prev_cum_dist:.1f}m<br>"
-                                                    f"Odległość boczna: {dist:.1f}m &lt; {evaluator.corridor_threshold}m<br>"
+                                                    f"Odległość boczna: {dist:.1f}m &lt; {evaluator_params.default_corridor_threshold_meters}m<br>"
                                                     f"Kąt zwrotu: {math.degrees(delta_heading):.1f}°<br>"
-                                                    f"Mnożnik kary: {OPPOSITE_CORRIDOR_PENALTY_MULTIPLIER}x"
+                                                    f"Mnożnik kary: {evaluator_params.opposite_corridor_penalty_multiplier}x"
                                                 ),
                                             ).add_to(route_group)
 
@@ -315,7 +304,7 @@ def visualize_all_routes_overlaps(
 
 
 def main():
-    center = GeoPoint(latitude=50.45, longitude=23.423)  # TL
+    center = GeoPoint(latitude=50.45, longitude=23.423)   # TL
     # center = GeoPoint(latitude=52.23, longitude=21.00)    # WWA
     # center = GeoPoint(latitude=50.485, longitude=23.495)    # Justynowka
     radius_meters = 2500.0
@@ -331,16 +320,23 @@ def main():
     start_node_id, snapped_center = snapper.snap_point(center)
     print(f"   -> Start snap: node {start_node_id} ({snapped_center.latitude:.5f}, {snapped_center.longitude:.5f})")
 
+    # 1. Konfiguracja parametrów ewaluatora
+    evaluator_params = EvaluatorParams(
+        distance_penalty_weight=2.0,
+        overlap_penalty_weight=5.0,
+        bounding_box=BoundingBoxEnum.M_80.value,
+    )
+
+    # 2. Parametry ACO z przekazaniem konfiguracji ewaluatora
     aco_params = ACOParams(
-        num_ants=15,
-        num_iterations=10,
+        num_ants=25,
+        num_iterations=15,
         alpha=1.0,
         beta=2.0,
         evaporation_rate=0.15,
         initial_pheromone=1.0,
         target_distance=target_distance_meters,
-        fitness_alpha=2.0,
-        fitness_beta=3.0,
+        evaluator_params=evaluator_params,
     )
 
     routes_data = []
@@ -352,18 +348,15 @@ def main():
     for route_idx in range(1, 6):
         print(f"\n--- Generowanie Wariantu Trasy #{route_idx}/5 ---")
 
-        # 1. Losowanie szkieletu punktów kontrolnych
         raw_checkpoints = CheckpointsGenerator.generate_checkpoints(center=center, radius=radius_meters)
         snapped_pairs = snapper.snap_points(raw_checkpoints)
 
         snapped_node_ids = [start_node_id] + [node_id for node_id, _ in snapped_pairs]
         snapped_checkpoints = [pt for _, pt in snapped_pairs]
 
-        # 2. Uproszczenie grafu
         converter = GraphConverter(original_map=raw_graph)
         simple_graph = converter.convert_graph_to_algorithm(protected_nodes=set(snapped_node_ids))
 
-        # 3. Korytarze etapowe
         points_chain = [snapped_center] + snapped_checkpoints
         stage_subgraphs = Subgrapher.extract_subgraphs(
             map_graph=simple_graph,
@@ -373,7 +366,6 @@ def main():
             max_lateral_slack=320.0,
         )
 
-        # 4. Refiner etapów
         refined_node_ids, stage_subgraphs = CheckpointRefiner.refine_stage_checkpoints(
             stage_subgraphs=stage_subgraphs,
             checkpoint_node_ids=snapped_node_ids,
@@ -388,7 +380,6 @@ def main():
             lon = node_data.get("x", node_data.get("lon"))
             refined_checkpoints.append(GeoPoint(latitude=lat, longitude=lon))
 
-        # 5. Uruchomienie ACO
         aco = ACO(
             params=aco_params,
             checkpoints=refined_node_ids,
@@ -399,12 +390,11 @@ def main():
         reconstructed_pts = converter.reconstruct_route_from_node_ids(route_nodes)
         actual_distance = calculate_reconstructed_distance(reconstructed_pts)
 
-        # 6. Pełna ocena z logowaniem breakdownu
         breakdown = aco.evaluator.evaluate_with_breakdown(
             full_path=route_nodes,
             total_distance=actual_distance,
         )
-        breakdown.log_summary(f"Wariant #{route_idx}")
+        # breakdown.log_summary(f"Wariant #{route_idx}")
 
         routes_data.append(
             {
@@ -416,7 +406,7 @@ def main():
             }
         )
 
-    # 1. Główna mapa porównawcza 5 tras
+    # 1. Mapa porównawcza 5 tras
     plot_routes_comparison_map(
         converter=converter,
         snapped_center=snapped_center,
@@ -425,10 +415,11 @@ def main():
         output_html="test_5_different_routes_comparison.html",
     )
 
-    # 2. Zbiorcza mapa overlapów uwzględniająca test prostopadłości
+    # 2. Zbiorcza mapa nakładań z parametrami z EvaluatorParams
     visualize_all_routes_overlaps(
         snapped_center=snapped_center,
         routes_data=routes_data,
+        evaluator_params=evaluator_params,
         output_html_path="routes_overlap_comparison.html",
     )
 
