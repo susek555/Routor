@@ -149,7 +149,7 @@ class ACO:
             else:
                 full_path.extend(stage_path[1:])
 
-        fitness = self.evaluator.evaluate(full_path, all_edges, total_dist)
+        fitness = self.evaluator.evaluate(full_path, total_dist)
         return full_path, all_edges, total_dist, fitness
 
     def generate_route(self) -> tuple[list[int], float]:

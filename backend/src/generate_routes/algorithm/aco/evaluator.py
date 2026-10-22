@@ -240,7 +240,7 @@ class RouteEvaluator:
         full_path: list[int],
         total_distance: float,
     ) -> EvaluationBreakdown:
-        """Returns comprehensive diagnostic metrics of the fitness calculation."""
+        """Returns a detailed breakdown of the fitness evaluation for a candidate route."""
         if not full_path or full_path[0] != full_path[-1]:
             return EvaluationBreakdown(
                 total_distance=total_distance,
@@ -284,7 +284,6 @@ class RouteEvaluator:
     def evaluate(
         self,
         full_path: list[int],
-        traversed_edges: list[frozenset[int]] | None = None,
         total_distance: float = 0.0,
     ) -> float:
         """Calculates normalized global fitness score."""

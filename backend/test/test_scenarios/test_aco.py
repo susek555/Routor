@@ -390,12 +390,6 @@ def main():
         reconstructed_pts = converter.reconstruct_route_from_node_ids(route_nodes)
         actual_distance = calculate_reconstructed_distance(reconstructed_pts)
 
-        breakdown = aco.evaluator.evaluate_with_breakdown(
-            full_path=route_nodes,
-            total_distance=actual_distance,
-        )
-        # breakdown.log_summary(f"Wariant #{route_idx}")
-
         routes_data.append(
             {
                 "path": route_nodes,
