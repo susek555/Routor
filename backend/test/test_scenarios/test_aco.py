@@ -140,10 +140,12 @@ def visualize_all_routes_overlaps(
 ) -> None:
     """Generuje wspólną mapę Folium dla wszystkich tras z diagnostyką overlapów
 
-    używając próbek, testu prostopadłości korytarza i separacji wzdłuż trasy (>=180m).
+    używając próbek, testu prostopadłości korytarza, separacji wzdłuż trasy (>=90m)
+    oraz pełnego wykluczenia strefy Start/Meta (150m) dla nawrotów i korytarzy.
     """
     debug_map = create_base_map(snapped_center, zoom=14)
 
+    # Strefa ochronna Start/Meta
     zone_layer = folium.FeatureGroup(name="Strefa Start/Meta (Ochronna)", show=True)
     folium.Circle(
         location=[snapped_center.latitude, snapped_center.longitude],
@@ -151,7 +153,7 @@ def visualize_all_routes_overlaps(
         color="#28a745",
         fill=True,
         fill_opacity=0.2,
-        tooltip="Start/Finish Protected Exclusion Zone",
+        tooltip=f"Start/Finish Protected Exclusion Zone ({START_FINISH_EXCLUSION_RADIUS_METERS:.0f}m)",
     ).add_to(zone_layer)
     folium.Marker(
         [snapped_center.latitude, snapped_center.longitude],
@@ -162,6 +164,7 @@ def visualize_all_routes_overlaps(
 
     total_out_and_back = 0
     total_opposite = 0
+    start_coord = (snapped_center.latitude, snapped_center.longitude)
 
     for idx, item in enumerate(routes_data, start=1):
         full_path: list[int] = item["path"]
@@ -173,7 +176,7 @@ def visualize_all_routes_overlaps(
 
         route_group = folium.FeatureGroup(name=f"Nakładania - Trasa #{idx}", show=(idx == 1))
 
-        # Ścieżka bazowa z dyskretnych próbek
+        # Ścieżka bazowa ze zrekonstruowanych próbek
         path_coords: list[tuple[float, float]] = []
         for u, v in zip(full_path[:-1], full_path[1:]):
             samples, _ = evaluator.edge_info_cache.get((u, v), ([(0.0, 0.0)], 1.0))
@@ -187,11 +190,9 @@ def visualize_all_routes_overlaps(
             tooltip=f"Trasa #{idx} Path",
         ).add_to(route_group)
 
-        start_samples, _ = evaluator.edge_info_cache.get((full_path[0], full_path[1]), ([(0.0, 0.0)], 1.0))
-        start_coord = start_samples[0]
-
         visited_edges: set[frozenset[int]] = set()
-        history: list[tuple[tuple[float, float], float, float]] = []
+        # Format historii identyczny jak w RouteEvaluator: (punkt, azymut, dystans_trasy, czy_w_strefie_start)
+        history: list[tuple[tuple[float, float], float, float, bool]] = []
         current_cumulative_dist = 0.0
 
         out_and_back_count = 0
@@ -209,32 +210,43 @@ def visualize_all_routes_overlaps(
             c_v = evaluator.node_coord_cache.get(v, (0.0, 0.0))
             curr_heading = _get_heading_rad(c_u, c_v)
 
-            # 1. Bezwzględne powtórzenie topologiczne
+            # Sprawdzenie, czy krawędź dotyka strefy ochronnej
+            is_edge_protected = any(evaluator._is_near_start_finish(pt, start_coord) for pt in samples)
+
+            # 1. Bezwzględne powtórzenie topologiczne (tylko poza strefą ochronną)
             if edge_key in visited_edges:
-                out_and_back_count += 1
-                mid_sample = samples[len(samples) // 2]
-                folium.CircleMarker(
-                    location=[mid_sample[0], mid_sample[1]],
-                    radius=6,
-                    color="#dc3545",
-                    fill=True,
-                    fill_color="#dc3545",
-                    fill_opacity=0.9,
-                    popup=(
-                        f"<b>TRASA #{idx} - OUT-AND-BACK</b><br>"
-                        f"Krok: {i}<br>Krawędź: ({u}, {v})<br>"
-                        f"Długość: {edge_len:.1f}m<br>"
-                        f"Kara: {OUT_AND_BACK_PENALTY_MULTIPLIER}x"
-                    ),
-                ).add_to(route_group)
+                if not is_edge_protected:
+                    out_and_back_count += 1
+                    mid_sample = samples[len(samples) // 2]
+                    folium.CircleMarker(
+                        location=[mid_sample[0], mid_sample[1]],
+                        radius=6,
+                        color="#dc3545",
+                        fill=True,
+                        fill_color="#dc3545",
+                        fill_opacity=0.9,
+                        popup=(
+                            f"<b>TRASA #{idx} - OUT-AND-BACK</b><br>"
+                            f"Krok: {i}<br>Krawędź: ({u}, {v})<br>"
+                            f"Długość: {edge_len:.1f}m<br>"
+                            f"Kara: {OUT_AND_BACK_PENALTY_MULTIPLIER}x"
+                        ),
+                    ).add_to(route_group)
             else:
-                # 2. Przeciwbieżny korytarz z testem prostopadłości
-                if not evaluator._is_near_start_finish(samples[0], start_coord):
+                # 2. Przeciwbieżny korytarz z testem kątowym i geometrycznym
+                if not is_edge_protected:
                     conflict_found = False
                     for pt in samples:
-                        lat_m, lon_m = pt
+                        if evaluator._is_near_start_finish(pt, start_coord):
+                            continue
 
-                        for (prev_lat, prev_lon), prev_heading, prev_cum_dist in history:
+                        lat_m, lon_m = pt
+                        for (prev_lat, prev_lon), prev_heading, prev_cum_dist, prev_in_zone in history:
+                            # Ignoruj punkty z historii należące do strefy ochronnej
+                            if prev_in_zone:
+                                continue
+
+                            # Odległość wzdłuż trasy (ochrona przed narożnikami)
                             if (current_cumulative_dist - prev_cum_dist) < MIN_PATH_SEPARATION_METERS:
                                 continue
 
@@ -245,6 +257,7 @@ def visualize_all_routes_overlaps(
                                     if delta_heading > math.pi:
                                         delta_heading = 2.0 * math.pi - delta_heading
 
+                                    # Zwrot przeciwny (>= 140 stopni)
                                     if delta_heading >= ANTIPARALLEL_MIN_RAD:
                                         if evaluator._is_perpendicular_corridor(pt, (prev_lat, prev_lon), curr_heading):
                                             opposite_count += 1
@@ -282,7 +295,9 @@ def visualize_all_routes_overlaps(
 
             visited_edges.add(edge_key)
             for pt in samples:
-                history.append((pt, curr_heading, current_cumulative_dist))
+                in_zone = evaluator._is_near_start_finish(pt, start_coord)
+                history.append((pt, curr_heading, current_cumulative_dist, in_zone))
+
             current_cumulative_dist += edge_len
 
         route_group.add_to(debug_map)
@@ -300,7 +315,9 @@ def visualize_all_routes_overlaps(
 
 
 def main():
-    center = GeoPoint(latitude=52.23, longitude=21.00)  # Warszawa
+    center = GeoPoint(latitude=50.45, longitude=23.423)  # TL
+    # center = GeoPoint(latitude=52.23, longitude=21.00)    # WWA
+    # center = GeoPoint(latitude=50.485, longitude=23.495)    # Justynowka
     radius_meters = 2500.0
     target_distance_meters = 2.0 * radius_meters
 
