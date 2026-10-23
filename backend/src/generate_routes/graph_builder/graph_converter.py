@@ -19,11 +19,13 @@ class GraphConverter:
         protected_nodes = protected_nodes or set()
         working_graph: Map = self.original_map.copy()
 
-        # Step 1: Remove private vehicle driveways and parking aisles
+        # Step 1: Remove private vehicle driveways, parking aisles, and private access roads
         drop_edge_keys = [
             (source_node, target_node, edge_key)
             for source_node, target_node, edge_key, edge_attrs in working_graph.edges(keys=True, data=True)
             if edge_attrs.get("service") in {"driveway", "parking_aisle"}
+            or edge_attrs.get("access") == "private"
+            or (isinstance(edge_attrs.get("access"), list) and "private" in edge_attrs.get("access"))
         ]
         for source_node, target_node, edge_key in drop_edge_keys:
             working_graph.remove_edge(source_node, target_node, key=edge_key)
