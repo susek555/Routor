@@ -194,7 +194,7 @@ class TestGraphConverterIntegration:
     def test_reconstruct_route_fallback_to_node_coords_when_no_linestring(self, linear_corridor_map):
         """Falls back to straight node coordinates when edges lack LineString geometry."""
         converter = GraphConverter(original_map=linear_corridor_map)
-        simplified = converter.convert_graph_to_algorithm()
+        converter.convert_graph_to_algorithm()
 
         # Reconstruct path from simplified end nodes [1, 4]
         route = converter.reconstruct_route_from_node_ids([1, 4])
