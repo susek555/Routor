@@ -31,3 +31,10 @@ def get_min_edge_length(graph: Map, u: int, v: int) -> float:
     if not edge_dict:
         return 1.0
     return min(data.get("length", 1.0) for data in edge_dict.values())
+
+
+def get_heading_rad(p1: tuple[float, float], p2: tuple[float, float]) -> float:
+    """Calculates directional heading angle in radians from point 1 to point 2."""
+    lat1, lon1 = p1
+    lat2, lon2 = p2
+    return math.atan2(lat2 - lat1, lon2 - lon1)

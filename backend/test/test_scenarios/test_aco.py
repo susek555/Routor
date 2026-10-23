@@ -9,9 +9,8 @@ from src.generate_routes.algorithm.aco.aco import ACO
 from src.generate_routes.algorithm.aco.aco_params import ACOParams
 from src.generate_routes.algorithm.aco.evaluator import (
     RouteEvaluator,
-    _get_heading_rad,
 )
-from src.generate_routes.algorithm.aco.utils.common import haversine
+from src.generate_routes.algorithm.aco.utils.common import haversine, get_heading_rad
 from src.generate_routes.algorithm.aco.utils.evaluator import BoundingBoxEnum, EvaluatorParams
 from src.generate_routes.algorithm.checkpoint_refiner import CheckpointRefiner
 from src.generate_routes.algorithm.checkpoints_generator import CheckpointsGenerator
@@ -201,7 +200,7 @@ def visualize_all_routes_overlaps(
 
             c_u = evaluator.node_coord_cache.get(u, (0.0, 0.0))
             c_v = evaluator.node_coord_cache.get(v, (0.0, 0.0))
-            curr_heading = _get_heading_rad(c_u, c_v)
+            curr_heading = get_heading_rad(c_u, c_v)
 
             is_edge_protected = any(evaluator._is_near_start_finish(pt, start_coord) for pt in samples)
 
@@ -304,7 +303,7 @@ def visualize_all_routes_overlaps(
 
 
 def main():
-    center = GeoPoint(latitude=50.45, longitude=23.423)   # TL
+    center = GeoPoint(latitude=50.45, longitude=23.423)  # TL
     # center = GeoPoint(latitude=52.23, longitude=21.00)    # WWA
     # center = GeoPoint(latitude=50.485, longitude=23.495)    # Justynowka
     radius_meters = 2500.0
@@ -396,7 +395,6 @@ def main():
                 "length": actual_distance,
                 "refined_checkpoints": refined_checkpoints,
                 "evaluator": aco.evaluator,
-                "breakdown": breakdown,
             }
         )
 

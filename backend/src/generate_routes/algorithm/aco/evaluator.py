@@ -1,22 +1,13 @@
 import math
 
-import networkx as nx
-
 from src.generate_routes.algorithm.aco.utils.common import (
+    get_heading_rad,
     get_min_edge_length,
     get_node_coords,
     haversine,
 )
 from src.generate_routes.algorithm.aco.utils.evaluator import EvaluationBreakdown, EvaluatorParams
-
-type Map = nx.MultiDiGraph
-
-
-def _get_heading_rad(p1: tuple[float, float], p2: tuple[float, float]) -> float:
-    """Calculates directional heading angle in radians from point 1 to point 2."""
-    lat1, lon1 = p1
-    lat2, lon2 = p2
-    return math.atan2(lat2 - lat1, lon2 - lon1)
+from src.generate_routes.data.map import Map
 
 
 class RouteEvaluator:
@@ -97,7 +88,7 @@ class RouteEvaluator:
         curr_heading: float,
     ) -> bool:
         """Checks if the vector connecting both points is perpendicular to the heading."""
-        connector_heading = _get_heading_rad(prev_pt, sample_pt)
+        connector_heading = get_heading_rad(prev_pt, sample_pt)
         angle_to_connector = abs(curr_heading - connector_heading)
         if angle_to_connector > math.pi:
             angle_to_connector = 2.0 * math.pi - angle_to_connector
@@ -192,7 +183,7 @@ class RouteEvaluator:
 
             c_u = self.node_coord_cache.get(u, (0.0, 0.0))
             c_v = self.node_coord_cache.get(v, (0.0, 0.0))
-            curr_heading = _get_heading_rad(c_u, c_v)
+            curr_heading = get_heading_rad(c_u, c_v)
 
             is_edge_protected = self._is_edge_in_exclusion_zone(samples, start_coord)
 

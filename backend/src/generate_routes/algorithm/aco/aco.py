@@ -8,6 +8,7 @@ from src.generate_routes.algorithm.aco.evaluator import RouteEvaluator
 from src.generate_routes.algorithm.aco.heuristics import BudgetManager
 from src.generate_routes.algorithm.aco.stage_walker import AntState, StageWalker, WalkerParams
 from src.generate_routes.algorithm.aco.utils.evaluator import EvaluationBreakdown, EvaluatorParams
+from src.generate_routes.algorithm.aco.utils.heuristics import BudgetParams
 from src.generate_routes.data.map import Map
 
 logger = logging.getLogger(__name__)
@@ -39,6 +40,7 @@ class ACO:
             stage_graphs=self.stage_graphs,
             checkpoints=self.checkpoints,
             target_distance=self.params.target_distance,
+            params=BudgetParams(),
         )
         self.evaluator = RouteEvaluator(
             stage_graphs=self.stage_graphs,
@@ -72,7 +74,7 @@ class ACO:
             except (nx.NetworkXNoPath, nx.NodeNotFound):
                 continue
 
-            for u, v in zip(stage_segment[:-1], stage_segment[1:]):
+            for u, v in zip(stage_segment[:-1], stage_segment[1:], strict=False):
                 edge_data = graph.get_edge_data(u, v, default={})
                 edge_len = min((d.get("length", 1.0) for d in edge_data.values()), default=1.0)
                 skeleton_distance += edge_len
