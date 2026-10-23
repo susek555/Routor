@@ -9,6 +9,7 @@ from src.generate_routes.algorithm.aco.heuristics import BudgetManager
 from src.generate_routes.algorithm.aco.stage_walker import AntState, StageWalker, WalkerParams
 from src.generate_routes.algorithm.aco.utils.evaluator import EvaluationBreakdown, EvaluatorParams
 from src.generate_routes.algorithm.aco.utils.heuristics import BudgetParams
+from src.generate_routes.algorithm.aco.utils.stage_walker import WalkerParams
 from src.generate_routes.data.map import Map
 
 logger = logging.getLogger(__name__)
@@ -50,12 +51,10 @@ class ACO:
                 overlap_penalty_weight=self.params.fitness_overlap_penalty,
             ),
         )
-
-        walker_params = WalkerParams(alpha=self.params.alpha, beta=self.params.beta)
         self.walker = StageWalker(
             pheromone_registry=self.registry,
             budget_manager=self.budget_manager,
-            params=walker_params,
+            params=WalkerParams(alpha=self.params.alpha, beta=self.params.beta),
         )
 
     def _build_dijkstra_skeleton(self) -> tuple[list[int], float]:

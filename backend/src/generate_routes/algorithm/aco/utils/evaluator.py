@@ -6,7 +6,7 @@ from enum import Enum
 logger = logging.getLogger(__name__)
 
 
-@dataclass
+@dataclass(frozen=True)
 class BoundingBox:
     DEG_LAT: float
     DEG_LON: float
@@ -19,7 +19,7 @@ class BoundingBoxEnum(Enum):
     M_80 = BoundingBox(DEG_LAT=0.00073, DEG_LON=0.00120)
 
 
-@dataclass
+@dataclass(frozen=True)
 class EvaluatorParams:
     distance_penalty_weight: float
     overlap_penalty_weight: float
