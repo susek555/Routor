@@ -8,16 +8,6 @@ from src.generate_routes.algorithm.aco.stage_walker import AntState, StageWalker
 from src.generate_routes.algorithm.aco.utils.evaluator import EvaluationBreakdown
 from src.generate_routes.data.map import Map
 
-# Inter-stage slack damping and absolute clamping constraints
-INTER_STAGE_SLACK_DAMPING = 0.4
-MAX_INTER_STAGE_SLACK_METERS = 250.0
-
-# Pheromone deposit multiplier applied to positive route fitness
-PHEROMONE_DEPOSIT_MULTIPLIER = 2.0
-
-# Initial baseline shortest path pheromone multiplier
-WARM_START_SEED_MULTIPLIER = 1.5
-
 
 class ACO:
     """Coordinates the Ant Colony Optimization loop over multiple stage graphs."""
@@ -126,10 +116,10 @@ class ACO:
             )
 
             raw_slack = effective_budget - stage_dist
-            damped_slack = raw_slack * INTER_STAGE_SLACK_DAMPING
+            damped_slack = raw_slack * self.params.inter_stage_slack_damping
             accumulated_slack = max(
-                -MAX_INTER_STAGE_SLACK_METERS,
-                min(MAX_INTER_STAGE_SLACK_METERS, damped_slack),
+                -self.params.max_inter_stage_slack_meters,
+                min(self.params.max_inter_stage_slack_meters, damped_slack),
             )
 
             total_dist += stage_dist
@@ -153,7 +143,7 @@ class ACO:
         best_fitness = self.evaluator.evaluate(skeleton_path, total_distance=skeleton_dist) if skeleton_path else -1.0
 
         if skeleton_path:
-            self.registry.seed_path_pheromones(skeleton_path, boost_factor=WARM_START_SEED_MULTIPLIER)
+            self.registry.seed_path_pheromones(skeleton_path, boost_factor=self.params.warm_start_seed_multiplier)
 
         # 2. Main ACO exploration loop (can now run with fewer iterations, e.g. 15-20)
         for _ in range(self.params.num_iterations):
@@ -170,7 +160,7 @@ class ACO:
 
                 if fitness > 0.0:
                     has_valid_routes = True
-                    deposit_amount = fitness * PHEROMONE_DEPOSIT_MULTIPLIER
+                    deposit_amount = fitness * self.params.pheromone_deposit_multiplier
                     for edge_key in edges:
                         edge_id = self.registry.get_edge_id(*tuple(edge_key))
                         if edge_id is not None:

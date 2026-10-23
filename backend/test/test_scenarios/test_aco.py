@@ -315,18 +315,24 @@ def main():
         print("❌ Graf jest pusty.")
         return
 
-    snapper = Snapper(raw_map=raw_graph)
+    # 1. Konwersję i uproszczenie wykonujemy RAZ na samym początku
+    print("2. Upraszczanie grafu i usuwanie dróg prywatnych...")
+    converter = GraphConverter(original_map=raw_graph)
+    simple_graph = converter.convert_graph_to_algorithm()
+
+    # 2. Snapper konfigurujemy na uproszczonym i oczyszczonym grafie!
+    snapper = Snapper(raw_map=simple_graph)
     start_node_id, snapped_center = snapper.snap_point(center)
     print(f"   -> Start snap: node {start_node_id} ({snapped_center.latitude:.5f}, {snapped_center.longitude:.5f})")
 
-    # 1. Konfiguracja parametrów ewaluatora
+    # 3. Konfiguracja parametrów ewaluatora
     evaluator_params = EvaluatorParams(
         distance_penalty_weight=2.0,
         overlap_penalty_weight=5.0,
         bounding_box=BoundingBoxEnum.M_80.value,
     )
 
-    # 2. Parametry ACO z przekazaniem konfiguracji ewaluatora
+    # 4. Parametry ACO z przekazaniem konfiguracji ewaluatora
     aco_params = ACOParams(
         num_ants=25,
         num_iterations=15,
@@ -339,7 +345,6 @@ def main():
     )
 
     routes_data = []
-    converter = None
 
     print(f"\n🎯 Docelowy dystans: {target_distance_meters / 1000.0:.2f} km ({target_distance_meters:.0f} m)")
     print("=" * 80)
@@ -347,14 +352,12 @@ def main():
     for route_idx in range(1, 6):
         print(f"\n--- Generowanie Wariantu Trasy #{route_idx}/5 ---")
 
+        # Generowanie losowych punktów kontrolnych dla danego wariantu
         raw_checkpoints = CheckpointsGenerator.generate_checkpoints(center=center, radius=radius_meters)
         snapped_pairs = snapper.snap_points(raw_checkpoints)
 
         snapped_node_ids = [start_node_id] + [node_id for node_id, _ in snapped_pairs]
         snapped_checkpoints = [pt for _, pt in snapped_pairs]
-
-        converter = GraphConverter(original_map=raw_graph)
-        simple_graph = converter.convert_graph_to_algorithm(protected_nodes=set(snapped_node_ids))
 
         points_chain = [snapped_center] + snapped_checkpoints
         stage_subgraphs = Subgrapher.extract_subgraphs(

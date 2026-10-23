@@ -2,8 +2,6 @@ import numpy as np
 
 from src.generate_routes.data.map import Map
 
-DEFAULT_SEED_BOOST_FACTOR = 1.5
-
 
 class EdgePheromoneRegistry:
     """Manages dense 1D pheromone arrays mapped to undirected graph edges."""
@@ -44,7 +42,7 @@ class EdgePheromoneRegistry:
     def seed_path_pheromones(
         self,
         path: list[int],
-        boost_factor: float = DEFAULT_SEED_BOOST_FACTOR,
+        boost_factor: float,
     ) -> None:
         """Seeds initial pheromones along a baseline shortest path to guide ant convergence."""
         target_pheromone = self.initial_pheromone * boost_factor

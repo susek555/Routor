@@ -24,6 +24,11 @@ class ACOParams:
     target_distance: float = 0  # Target route length in meters (L_target)
     fitness_distance_penalty: float = DEFAULT_FITNESS_DISTANCE_PENALTY  # Penalty weight for distance deviation
     fitness_overlap_penalty: float = DEFAULT_FITNESS_OVERLAP_PENALTY  # Penalty weight for inter-stage edge overlap
+    pheromone_deposit_multiplier: float = 2.0  # Pheromone deposit multiplier applied to positive route fitness
+    warm_start_seed_multiplier: float = 1.5  # Initial baseline shortest path pheromone multiplier
+    # Inter-stage slack damping and absolute clamping constraints
+    inter_stage_slack_damping: float = 0.4
+    max_inter_stage_slack_meters: float = 250.0
     evaluator_params: EvaluatorParams = field(
         default_factory=lambda: EvaluatorParams(
             distance_penalty_weight=DEFAULT_FITNESS_DISTANCE_PENALTY,

@@ -1,9 +1,12 @@
+import logging
+
 import networkx as nx
 
 from src.generate_routes.data.map import Map
 
 EXPECTED_CHECKPOINT_COUNT = 4
 
+logger = logging.getLogger(__name__)
 
 class CheckpointRefiner:
     @staticmethod
@@ -34,14 +37,14 @@ class CheckpointRefiner:
         prev_node, curr_node, next_node = nodes
 
         if not graph_in.has_node(curr_node) or not graph_out.has_node(curr_node):
-            print(f"   [CP{checkpoint_idx}] ⚠️ Missing node {curr_node} at subgraph junction")
+            logger.warning(f"   [CP{checkpoint_idx}] ⚠️ Missing node {curr_node} at subgraph junction")
             return None
 
         try:
             path_in = nx.shortest_path(graph_in, source=prev_node, target=curr_node, weight="length")
             path_out = nx.shortest_path(graph_out, source=curr_node, target=next_node, weight="length")
         except (nx.NetworkXNoPath, nx.NodeNotFound):
-            print(f"   [CP{checkpoint_idx}] ⚠️ No valid path through adjacent stages")
+            logger.warning(f"   [CP{checkpoint_idx}] ⚠️ No valid path through adjacent stages")
             return None
 
         rev_in = list(reversed(path_in))
@@ -52,7 +55,7 @@ class CheckpointRefiner:
             overlap_count += 1
 
         if overlap_count <= 1:
-            print(f"   [CP{checkpoint_idx}] ℹ️ No overlapping edges (smooth transit)")
+            logger.info(f"   [CP{checkpoint_idx}] ℹ️ No overlapping edges (smooth transit)")
             return None
 
         spur_nodes = rev_in[:overlap_count]
@@ -63,13 +66,13 @@ class CheckpointRefiner:
         )
         total_spur_cost = spur_len * 2.0
 
-        print(f"   [CP{checkpoint_idx}] 🔍 Detected spur: {spur_len:.1f}m (round-trip: {total_spur_cost:.1f}m)")
+        logger.debug(f"   [CP{checkpoint_idx}] 🔍 Detected spur: {spur_len:.1f}m (round-trip: {total_spur_cost:.1f}m)")
 
         if total_spur_cost <= max_retraction_meters:
-            print(f"   [CP{checkpoint_idx}] ✂️ Collapsing checkpoint to fork: node {fork_candidate}")
+            logger.info(f"   [CP{checkpoint_idx}] ✂️ Collapsing checkpoint to fork: node {fork_candidate}")
             return fork_candidate
 
-        print(
+        logger.info(
             f"   [CP{checkpoint_idx}] ⛔ Spur too long "
             f"({total_spur_cost:.1f}m > limit {max_retraction_meters:.1f}m) - preserving out-and-back"
         )
