@@ -1,18 +1,12 @@
-import logging
-
 import networkx as nx
 
 from src.generate_routes.algorithm.aco.aco_params import ACOParams
 from src.generate_routes.algorithm.aco.edge_pheromone_registry import EdgePheromoneRegistry
 from src.generate_routes.algorithm.aco.evaluator import RouteEvaluator
 from src.generate_routes.algorithm.aco.heuristics import BudgetManager
-from src.generate_routes.algorithm.aco.stage_walker import AntState, StageWalker, WalkerParams
-from src.generate_routes.algorithm.aco.utils.evaluator import EvaluationBreakdown, EvaluatorParams
-from src.generate_routes.algorithm.aco.utils.heuristics import BudgetParams
-from src.generate_routes.algorithm.aco.utils.stage_walker import WalkerParams
+from src.generate_routes.algorithm.aco.stage_walker import AntState, StageWalker
+from src.generate_routes.algorithm.aco.utils.evaluator import EvaluationBreakdown
 from src.generate_routes.data.map import Map
-
-logger = logging.getLogger(__name__)
 
 # Inter-stage slack damping and absolute clamping constraints
 INTER_STAGE_SLACK_DAMPING = 0.4
@@ -41,20 +35,17 @@ class ACO:
             stage_graphs=self.stage_graphs,
             checkpoints=self.checkpoints,
             target_distance=self.params.target_distance,
-            params=BudgetParams(),
+            params=self.params.heuristics_params,
         )
         self.evaluator = RouteEvaluator(
             stage_graphs=self.stage_graphs,
             target_distance=self.params.target_distance,
-            params=EvaluatorParams(
-                distance_penalty_weight=self.params.fitness_distance_penalty,
-                overlap_penalty_weight=self.params.fitness_overlap_penalty,
-            ),
+            params=self.params.evaluator_params,
         )
         self.walker = StageWalker(
             pheromone_registry=self.registry,
             budget_manager=self.budget_manager,
-            params=WalkerParams(alpha=self.params.alpha, beta=self.params.beta),
+            params=self.params.walker_params,
         )
 
     def _build_dijkstra_skeleton(self) -> tuple[list[int], float]:
