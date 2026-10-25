@@ -6,12 +6,12 @@ from src.database.geo_point import GeoPoint
 from src.generate_routes.data.map import Map
 
 # Buffer radius around checkpoint endpoints to ensure multiple entry/exit streets
-CHECKPOINT_BUFFER_RADIUS_METERS = 250.0
+CHECKPOINT_BUFFER_RADIUS_METERS = 500.0
 
 # Lateral slack bounds for elliptical stage corridor
-BASE_LATERAL_SLACK_METERS = 160.0
-MAX_LATERAL_SLACK_METERS = 320.0
-SLACK_FOCAL_GROWTH_FACTOR = 0.06
+BASE_LATERAL_SLACK_METERS = 500.0
+MAX_LATERAL_SLACK_METERS = 1000.0
+SLACK_FOCAL_GROWTH_FACTOR = 0.20
 
 # Expected checkpoint count for standard 4-stage loop partitioning
 EXPECTED_CHECKPOINT_COUNT = 4

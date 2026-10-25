@@ -303,10 +303,11 @@ def visualize_all_routes_overlaps(
 
 
 def main():
-    center = GeoPoint(latitude=50.45, longitude=23.423)  # TL
-    # center = GeoPoint(latitude=52.23, longitude=21.00)    # WWA
+    # center = GeoPoint(latitude=50.45, longitude=23.423)  # TL
+    # center = GeoPoint(latitude=52.323832, longitude=20.948670)
+    center = GeoPoint(latitude=52.23, longitude=21.00)    # WWA
     # center = GeoPoint(latitude=50.485, longitude=23.495)    # Justynowka
-    radius_meters = 2500.0
+    radius_meters = 1500.0
     target_distance_meters = 2.0 * radius_meters
 
     print("1. Pobieranie surowego grafu OSM raz dla całego obszaru...")
