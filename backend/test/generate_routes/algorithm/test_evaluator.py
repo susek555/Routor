@@ -11,14 +11,13 @@ MODULE_PATH = RouteEvaluator.__module__
 
 @pytest.fixture
 def default_evaluator_params():
-    """Provides a baseline EvaluatorParams configuration for testing."""
     params = MagicMock(spec=EvaluatorParams)
     params.edge_sample_step_meters = 20.0
-    params.start_finish_exclusion_radius_meters = 50.0
-    params.max_perpendicular_deviation_rad = math.pi / 4.0  # 45 degrees
+    params.start_finish_exclusion_radius_ratio = 0.03
+    params.max_perpendicular_deviation_rad = math.pi / 4.0
     params.min_path_separation_meters = 30.0
     params.default_corridor_threshold_meters = 25.0
-    params.antiparallel_min_rad = math.pi * 0.75  # 135 degrees
+    params.antiparallel_min_rad = math.pi * 0.75
     params.opposite_corridor_penalty_multiplier = 1.5
     params.out_and_back_penalty_multiplier = 2.0
     params.min_path_nodes_to_overlap = 3
@@ -183,12 +182,10 @@ class TestRouteEvaluatorUnitAndIntegration:
         default_evaluator_params,
     ):
         """Penalizes repeated topological edges when they lie outside the start/finish exclusion zone."""
-        # Exclusion zone covers start area (~100m) protecting edge (0, 1),
-        # but leaves node 1 and edge (1, 2) (~500m - 1000m north) completely unprotected.
-        default_evaluator_params.start_finish_exclusion_radius_meters = 100.0
+        # 100m exclusion on 2000m target -> ratio = 100 / 2000 = 0.03
+        default_evaluator_params.start_finish_exclusion_radius_ratio = 0.03
 
         graph = nx.MultiDiGraph()
-        # Node 0 at origin, node 1 and 2 placed ~550m and ~1100m north
         graph.add_node(0, y=52.000, x=21.000)
         graph.add_node(1, y=52.005, x=21.000)
         graph.add_node(2, y=52.010, x=21.000)
@@ -204,9 +201,6 @@ class TestRouteEvaluatorUnitAndIntegration:
             params=default_evaluator_params,
         )
 
-        # Path: 0 -> 1 -> 2 -> 1 -> 0
-        # Edge (0, 1) touches the start exclusion zone, so its repetition is not penalized.
-        # Edge (1, 2) is completely outside the zone, so its repetition is penalized.
         path = [0, 1, 2, 1, 0]
         out_and_back, _ = evaluator.calculate_overlap_details(path)
 
@@ -219,8 +213,7 @@ class TestRouteEvaluatorUnitAndIntegration:
         default_evaluator_params,
     ):
         """Evaluates a clean loop matching the target distance with no overlap penalties."""
-        # Configure generous exclusion zone to encompass the entire small test loop
-        default_evaluator_params.start_finish_exclusion_radius_meters = 1000.0
+        default_evaluator_params.start_finish_exclusion_radius_ratio = 0.80
 
         evaluator = RouteEvaluator(
             stage_graphs=[simple_loop_graph],
@@ -228,7 +221,7 @@ class TestRouteEvaluatorUnitAndIntegration:
             params=default_evaluator_params,
         )
         loop_path = [0, 1, 2, 0]
-        actual_distance = 1450.0  # Exactly matches target distance
+        actual_distance = 1450.0
 
         breakdown = evaluator.evaluate_with_breakdown(loop_path, total_distance=actual_distance)
 

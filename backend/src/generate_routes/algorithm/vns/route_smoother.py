@@ -47,7 +47,6 @@ class RouteSmoother:
             smoothed.append(full_path[i])
             curr_coord = self.sampler.get_coord(full_path[i], self.reference_graph)
 
-            shortcut_found = False
             max_lookahead = (
                 min(i + self.params.max_lookahead_nodes, n - 2)
                 if i < self.params.early_path_index_threshold
@@ -71,13 +70,11 @@ class RouteSmoother:
                         if len(shortcut) < (j - i):
                             smoothed.extend(shortcut[1:])
                             i = j
-                            shortcut_found = True
                             break
                     except (nx.NetworkXNoPath, nx.NodeNotFound):
                         continue
 
-            if not shortcut_found:
-                i += 1
+            i += 1
 
         smoothed_dist = self.calculate_path_distance(smoothed)
 
