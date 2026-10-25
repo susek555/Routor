@@ -4,7 +4,7 @@ import networkx as nx
 import pytest
 from src.generate_routes.algorithm.aco.aco import ACO
 from src.generate_routes.algorithm.aco.aco_params import ACOParams
-from src.generate_routes.algorithm.aco.utils.evaluator import EvaluationBreakdown
+from src.generate_routes.algorithm.evaluator_params import EvaluationBreakdown
 
 MODULE_PATH = ACO.__module__
 

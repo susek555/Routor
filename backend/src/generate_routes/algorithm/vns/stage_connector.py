@@ -1,5 +1,6 @@
 import networkx as nx
-from src.generate_routes.algorithm.aco.evaluator import RouteEvaluator
+
+from src.generate_routes.algorithm.evaluator import RouteEvaluator
 from src.generate_routes.data.map import Map
 
 

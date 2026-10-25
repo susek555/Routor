@@ -3,8 +3,8 @@ from unittest.mock import MagicMock, patch
 
 import networkx as nx
 import pytest
-from src.generate_routes.algorithm.aco.evaluator import RouteEvaluator
-from src.generate_routes.algorithm.aco.utils.evaluator import EvaluationBreakdown, EvaluatorParams
+from src.generate_routes.algorithm.evaluator import RouteEvaluator
+from src.generate_routes.algorithm.evaluator_params import EvaluationBreakdown, EvaluatorParams
 
 MODULE_PATH = RouteEvaluator.__module__
 

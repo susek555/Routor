@@ -1,7 +1,7 @@
 import logging
 
-from src.generate_routes.algorithm.aco.evaluator import RouteEvaluator
-from src.generate_routes.algorithm.aco.utils.evaluator import EvaluationBreakdown
+from src.generate_routes.algorithm.evaluator import RouteEvaluator
+from src.generate_routes.algorithm.evaluator_params import EvaluationBreakdown
 from src.generate_routes.algorithm.vns.detour_sampler import DetourSampler
 from src.generate_routes.algorithm.vns.neighborhoods import NeighborhoodOperator
 from src.generate_routes.algorithm.vns.route_smoother import RouteSmoother

@@ -1,8 +1,8 @@
 from dataclasses import dataclass, field
 
-from src.generate_routes.algorithm.aco.utils.evaluator import EvaluatorParams
 from src.generate_routes.algorithm.aco.utils.heuristics import BudgetParams
 from src.generate_routes.algorithm.aco.utils.stage_walker import WalkerParams
+from src.generate_routes.algorithm.evaluator_params import EvaluatorParams
 
 DEFAULT_FITNESS_DISTANCE_PENALTY = 2.0
 DEFAULT_FITNESS_OVERLAP_PENALTY = 3.0

@@ -6,7 +6,7 @@ from src.generate_routes.algorithm.aco.utils.common import (
     get_node_coords,
     haversine,
 )
-from src.generate_routes.algorithm.aco.utils.evaluator import EvaluationBreakdown, EvaluatorParams
+from src.generate_routes.algorithm.evaluator_params import EvaluationBreakdown, EvaluatorParams
 from src.generate_routes.data.map import Map
 
 

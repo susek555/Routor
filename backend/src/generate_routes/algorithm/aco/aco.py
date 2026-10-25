@@ -2,10 +2,10 @@ import networkx as nx
 
 from src.generate_routes.algorithm.aco.aco_params import ACOParams
 from src.generate_routes.algorithm.aco.edge_pheromone_registry import EdgePheromoneRegistry
-from src.generate_routes.algorithm.aco.evaluator import RouteEvaluator
 from src.generate_routes.algorithm.aco.heuristics import BudgetManager
 from src.generate_routes.algorithm.aco.stage_walker import AntState, StageWalker
-from src.generate_routes.algorithm.aco.utils.evaluator import EvaluationBreakdown
+from src.generate_routes.algorithm.evaluator import RouteEvaluator
+from src.generate_routes.algorithm.evaluator_params import EvaluationBreakdown
 from src.generate_routes.data.map import Map
 
 

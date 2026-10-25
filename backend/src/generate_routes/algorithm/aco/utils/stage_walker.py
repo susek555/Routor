@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 
-from src.generate_routes.algorithm.aco.utils.evaluator import BoundingBox, BoundingBoxEnum
+from src.generate_routes.algorithm.evaluator_params import BoundingBox, BoundingBoxEnum
 
 
 @dataclass(frozen=True)
