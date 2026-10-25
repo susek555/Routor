@@ -1,6 +1,6 @@
 import math
 
-from src.generate_routes.algorithm.aco.utils.common import (
+from src.generate_routes.algorithm.common_utils import (
     get_heading_rad,
     get_min_edge_length,
     get_node_coords,

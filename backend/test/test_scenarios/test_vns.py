@@ -7,7 +7,7 @@ import folium
 from folium import LayerControl
 from src.database.geo_point import GeoPoint
 from src.generate_routes.algorithm.evaluator import RouteEvaluator
-from src.generate_routes.algorithm.aco.utils.common import get_heading_rad, haversine
+from src.generate_routes.algorithm.common_utils import get_heading_rad, haversine
 from src.generate_routes.algorithm.evaluator_params import BoundingBoxEnum, EvaluatorParams
 from src.generate_routes.algorithm.checkpoint_refiner import CheckpointRefiner
 from src.generate_routes.algorithm.checkpoints_generator import CheckpointsGenerator

@@ -1,7 +1,7 @@
 import math
 import random
 
-from src.generate_routes.algorithm.aco.utils.common import get_node_coords, haversine
+from src.generate_routes.algorithm.common_utils import get_node_coords, haversine
 from src.generate_routes.algorithm.vns.vns_params import SamplerParams
 from src.generate_routes.data.map import Map
 

@@ -1,12 +1,12 @@
 import math
 
-from src.generate_routes.algorithm.aco.utils.common import (
+from src.generate_routes.algorithm.aco.utils.heuristics import BudgetParams
+from src.generate_routes.algorithm.common_utils import (
     get_heading_rad,
     get_min_edge_length,
     get_node_coords,
     haversine,
 )
-from src.generate_routes.algorithm.aco.utils.heuristics import BudgetParams
 from src.generate_routes.data.map import Map
 
 

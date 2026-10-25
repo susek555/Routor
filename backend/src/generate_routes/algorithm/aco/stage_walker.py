@@ -5,12 +5,12 @@ import numpy as np
 
 from src.generate_routes.algorithm.aco.edge_pheromone_registry import EdgePheromoneRegistry
 from src.generate_routes.algorithm.aco.heuristics import BudgetManager
-from src.generate_routes.algorithm.aco.utils.common import (
+from src.generate_routes.algorithm.aco.utils.stage_walker import WalkerParams
+from src.generate_routes.algorithm.common_utils import (
     get_min_edge_length,
     get_node_coords,
     haversine,
 )
-from src.generate_routes.algorithm.aco.utils.stage_walker import WalkerParams
 from src.generate_routes.data.map import Map
 
 

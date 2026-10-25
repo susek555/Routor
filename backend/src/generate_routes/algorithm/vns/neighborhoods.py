@@ -3,7 +3,7 @@ import random
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from src.generate_routes.algorithm.aco.utils.common import haversine
+from src.generate_routes.algorithm.common_utils import haversine
 from src.generate_routes.algorithm.vns.detour_sampler import DetourSampler
 from src.generate_routes.algorithm.vns.vns_params import NeighborhoodParams
 from src.generate_routes.data.map import Map
