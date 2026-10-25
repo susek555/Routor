@@ -12,6 +12,10 @@ class VNSParams:
     max_k: int = 4  # Skrócona, zwarta hierarchia sąsiedztw
     num_initial_samples: int = 3  # Liczba prób inicjalizacji szkieletu bazowego
 
+    max_iterations: int = 120  # Twardy sufit bezpieczeństwa
+    max_stagnation_iterations: int = 15  # Przerywamy, jeśli 15 kolejnych iteracji nie dało poprawy
+    target_fitness: float = 0.990  # Osiągnięcie tego wyniku kończy bieg natychmiast
+
     # Gęstość punktów na etap
     max_detours_per_stage: int = 4  # Maksymalna liczba punktów pośrednich na jeden etap
 

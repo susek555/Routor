@@ -128,12 +128,12 @@ def visualize_all_routes_overlaps(
     snapped_center: GeoPoint,
     routes_data: list[dict],
     evaluator_params: EvaluatorParams,
+    exclusion_radius: float,
     output_html_path: str = "routes_overlap_comparison.html",
 ) -> None:
     """Generuje wspólną mapę Folium dla wszystkich tras z detekcją nakładań."""
     debug_map = create_base_map(snapped_center, zoom=14)
 
-    exclusion_radius = evaluator_params.start_finish_exclusion_radius_meters
     deg_lat = evaluator_params.bounding_box.DEG_LAT
     deg_lon = evaluator_params.bounding_box.DEG_LON
 
@@ -300,11 +300,11 @@ def visualize_all_routes_overlaps(
 
 
 def main():
-    center = GeoPoint(latitude=50.45, longitude=23.423)  # TL
-    # center = GeoPoint(latitude=52.323832, longitude=20.948670)
+    # center = GeoPoint(latitude=50.45, longitude=23.423)  # TL
+    center = GeoPoint(latitude=52.323832, longitude=20.948670)
     # center = GeoPoint(latitude=52.23, longitude=21.00)  # WWA
     # center = GeoPoint(latitude=50.485, longitude=23.495)  # Justynowka
-    radius_meters = 20000.0
+    radius_meters = 5000.0
     target_distance_meters = 2.0 * radius_meters
 
     print("1. Pobieranie surowego grafu OSM raz dla całego obszaru...")
@@ -420,6 +420,7 @@ def main():
         snapped_center=snapped_center,
         routes_data=routes_data,
         evaluator_params=evaluator_params,
+        exclusion_radius=evaluator_params.start_finish_exclusion_radius_ratio * target_distance_meters,
         output_html_path="routes_overlap_comparison_vns.html",
     )
 

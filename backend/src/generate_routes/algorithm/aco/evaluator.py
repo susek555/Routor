@@ -71,7 +71,7 @@ class RouteEvaluator:
         start_coord: tuple[float, float],
     ) -> bool:
         """Checks if a point is located within the loop closing zone."""
-        return haversine(point, start_coord) <= self.params.start_finish_exclusion_radius_meters
+        return haversine(point, start_coord) <= self.params.start_finish_exclusion_radius_ratio * self.target_distance
 
     def _is_edge_in_exclusion_zone(
         self,

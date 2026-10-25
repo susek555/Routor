@@ -60,7 +60,8 @@ class EvaluatorParams:
     default_corridor_threshold_meters = 80.0
 
     # Protected loop-closing zone around the start/finish node
-    start_finish_exclusion_radius_meters = 150.0
+    # start_finish_exclusion_radius_meters = 150.0
+    start_finish_exclusion_radius_ratio = 0.03
 
 
 @dataclass

@@ -350,7 +350,9 @@ class VNSLoopGenerator:
                 # Tylko bardzo ciasne, ewidentne zawrotki w promieniu 20m
                 if haversine(curr_coord, target_coord) < 20.0:
                     try:
-                        shortcut = nx.shortest_path(ref_graph, source=full_path[i], target=full_path[j], weight="length")
+                        shortcut = nx.shortest_path(
+                            ref_graph, source=full_path[i], target=full_path[j], weight="length"
+                        )
                         if len(shortcut) < (j - i):
                             smoothed.extend(shortcut[1:])
                             i = j
@@ -377,8 +379,7 @@ class VNSLoopGenerator:
         if not path or len(path) < 2:
             return 0.0
         return sum(
-            self.evaluator.edge_info_cache.get((u, v), ([], 1.0))[1]
-            for u, v in zip(path[:-1], path[1:], strict=False)
+            self.evaluator.edge_info_cache.get((u, v), ([], 1.0))[1] for u, v in zip(path[:-1], path[1:], strict=False)
         )
 
     def _log_operator_stats(self) -> None:
@@ -453,21 +454,29 @@ class VNSLoopGenerator:
         # 3. Główna pętla VNS
         k = 1
         iteration = 0
+        stagnation_counter = 0
 
         while iteration < self.params.max_iterations:
             iteration += 1
+
+            # 1. Warunek natychmiastowego sukcesu
+            if best_fitness >= self.params.target_fitness:
+                logger.info(f"🎯 Osiągnięto target fitness ({best_fitness:.4f}) w {iteration}. iteracji. Przerywam.")
+                break
 
             cand_wps = self._shake(current_stage_wps, k, current_dist)
             cand_path, cand_dist, cand_fitness = self._evaluate_candidate_stages(cand_wps)
 
             if not cand_path:
                 k = (k % self.params.max_k) + 1
+                stagnation_counter += 1
+                if stagnation_counter >= self.params.max_stagnation_iterations:
+                    break
                 continue
 
-            # Kryterium akceptacji (Neighborhood Change)
+            # 2. Neighborhood Change (Akceptacja)
             if cand_fitness > best_fitness:
                 self.operator_stats[k]["improvements"] += 1
-
                 best_fitness = cand_fitness
                 best_path = cand_path
                 best_dist = cand_dist
@@ -475,9 +484,17 @@ class VNSLoopGenerator:
 
                 current_stage_wps = [list(s) for s in cand_wps]
                 current_dist = cand_dist
-                k = 1  # Reset do k=1 przy każdej poprawie
+
+                k = 1
+                stagnation_counter = 0  # Reset licznika stagnacji przy każdym sukcesie!
             else:
                 k = (k % self.params.max_k) + 1
+                stagnation_counter += 1
+
+            # 3. Warunek zatrzymania z powodu braku poprawy
+            if stagnation_counter >= self.params.max_stagnation_iterations:
+                logger.info(f"🛑 Stagnacja ({stagnation_counter} iteracji bez poprawy). Kończę VNS.")
+                break
 
         self._log_operator_stats()
 
