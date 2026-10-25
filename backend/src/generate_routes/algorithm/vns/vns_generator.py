@@ -15,7 +15,8 @@ logger = logging.getLogger(__name__)
 class VNSLoopGenerator:
     """Generuje pętlę biegową w architekturze VNS ze zwartą liczbą operatorów,
     ukierunkowaną losowością (Biased Randomization), korektą checkpointów,
-    fallbackiem topologicznym oraz post-processingiem wygładzającym niepotrzebne odnogi.
+    odpornym na rzadkie siatki (obszary wiejskie) fallbackiem topologicznym
+    oraz post-processingiem wygładzającym niepotrzebne odnogi.
     """
 
     OPERATOR_NAMES = {
@@ -54,7 +55,7 @@ class VNSLoopGenerator:
         return self.node_coord_cache[node]
 
     def _connect_stage(self, stage_idx: int, waypoints: list[int]) -> tuple[list[int], float]:
-        """Łączy punkty etapu najkrótszymi ścieżkami z 3-stopniowym bezpiecznym fallbackiem."""
+        """Łączy punkty etapu najkrótszymi ścieżkami z gwarantowanym, 4-stopniowym fallbackiem."""
         graph = self.stage_graphs[stage_idx]
 
         # --- POZIOM 1: Próba restrykcyjna (bez powtórzeń węzłów w etapie) ---
@@ -67,13 +68,24 @@ class VNSLoopGenerator:
         if soft_path:
             return soft_path, soft_dist
 
-        # --- POZIOM 3: Fallback awaryjny (odrzucenie punktów pośrednich, ratowanie bazą) ---
+        # --- POZIOM 3: Fallback bazy (odrzucenie punktów pośrednich, ratowanie prostą bazą) ---
         base_waypoints = [waypoints[0], waypoints[-1]]
         fallback_path, fallback_dist = self._try_connect_stage(graph, base_waypoints, allow_overlap=True)
         if fallback_path:
             return fallback_path, fallback_dist
 
-        return [], 0.0
+        # --- POZIOM 4: Fallback ostateczny (obszary wiejskie / zbyt ciasno wycięty podgraf) ---
+        # Sięgamy po pełny, globalny graf mapy (z pierwszego etapu lub ewaluatora)
+        try:
+            full_graph = getattr(self.evaluator, "graph", self.stage_graphs[0])
+            emergency_segment = nx.shortest_path(full_graph, source=waypoints[0], target=waypoints[-1], weight="length")
+            emergency_dist = sum(
+                self.evaluator.edge_info_cache.get((u, v), ([], 1.0))[1]
+                for u, v in zip(emergency_segment[:-1], emergency_segment[1:], strict=False)
+            )
+            return emergency_segment, emergency_dist
+        except (nx.NetworkXNoPath, nx.NodeNotFound, Exception):
+            return [], 0.0
 
     def _try_connect_stage(self, graph: Map, waypoints: list[int], allow_overlap: bool) -> tuple[list[int], float]:
         """Próbuje połączyć zadaną listę waypoints Dijkstrą."""
@@ -309,39 +321,36 @@ class VNSLoopGenerator:
     # --- WYGŁADZANIE TRASY (POST-PROCESSING: SPUR REMOVAL) ---
 
     def _smooth_route(self, full_path: list[int]) -> tuple[list[int], float]:
-        """Usuwa niepotrzebne 'wypustki' (ślepe wjazdy w uliczki z natychmiastowym powrotem).
-        Łączy bezpośrednio węzły leżące blisko siebie w przestrzeni, zastępując nawrotkę skrótem.
-        """
-        if len(full_path) < 5:
-            dist = sum(
-                self.evaluator.edge_info_cache.get((u, v), ([], 1.0))[1]
-                for u, v in zip(full_path[:-1], full_path[1:], strict=False)
-            )
-            return full_path, dist
+        """Usuwa lokalne mikro-wypustki bez ryzyka zwinięcia całej pętli ze startu do mety."""
+        if not full_path or len(full_path) < 10:
+            return full_path, self._calculate_path_distance(full_path)
 
-        # Do weryfikacji skrótów używamy głównego grafu (z pierwszego etapu / mapy globalnej)
-        ref_graph = self.stage_graphs[0]
+        ref_graph = getattr(self.evaluator, "graph", self.stage_graphs[0])
         smoothed: list[int] = []
         i = 0
         n = len(full_path)
+        original_dist = self._calculate_path_distance(full_path)
 
         while i < n:
             smoothed.append(full_path[i])
             curr_coord = self._get_coord(full_path[i], ref_graph)
 
             shortcut_found = False
-            # Szukamy czy kilka kroków dalej (od 4 do 14 węzłów w przód) nie wracamy w to samo miejsce
-            max_lookahead = min(i + 15, n - 1)
+            # Ograniczenie lookahead do max 8 węzłów (tylko mikro-zaułki)
+            # ZABEZPIECZENIE: j nie może sięgać do samego końca trasy (omijamy metę pętli)
+            max_lookahead = min(i + 8, n - 2) if i < 5 else min(i + 8, n - 1)
+
             for j in range(max_lookahead, i + 3, -1):
+                # Jeśli sprawdzamy węzły blisko początku i końca pętli, pomijamy (to nie jest odnoga, to domknięcie)
+                if i < 3 and j > n - 5:
+                    continue
+
                 target_coord = self._get_coord(full_path[j], ref_graph)
 
-                # Jeśli węzły dzieli w linii prostej mniej niż 35m, a ścieżka między nimi to pętla/nawrót
-                if haversine(curr_coord, target_coord) < 35.0:
+                # Tylko bardzo ciasne, ewidentne zawrotki w promieniu 20m
+                if haversine(curr_coord, target_coord) < 20.0:
                     try:
-                        shortcut = nx.shortest_path(
-                            ref_graph, source=full_path[i], target=full_path[j], weight="length"
-                        )
-                        # Jeśli skrót ma mniej węzłów niż wjazd i wyjazd, wstawiamy go
+                        shortcut = nx.shortest_path(ref_graph, source=full_path[i], target=full_path[j], weight="length")
                         if len(shortcut) < (j - i):
                             smoothed.extend(shortcut[1:])
                             i = j
@@ -353,13 +362,24 @@ class VNSLoopGenerator:
             if not shortcut_found:
                 i += 1
 
-        # Ponowne przeliczenie dokładnego dystansu wygładzonej trasy
-        smoothed_dist = 0.0
-        for u, v in zip(smoothed[:-1], smoothed[1:], strict=False):
-            _, edge_len = self.evaluator.edge_info_cache.get((u, v), ([], 1.0))
-            smoothed_dist += edge_len
+        smoothed_dist = self._calculate_path_distance(smoothed)
+
+        # ZABEZPIECZENIE ANTY-KASACYJNE:
+        # Jeśli wygładzanie zjadło trasę (np. na wsi, gdzie powrót szosą był celowy),
+        # bezwzględnie porzucamy skróty i zachowujemy oryginalną trasę VNS.
+        if smoothed_dist < 0.6 * self.params.target_distance or len(smoothed) < 4:
+            return full_path, original_dist
 
         return smoothed, smoothed_dist
+
+    def _calculate_path_distance(self, path: list[int]) -> float:
+        """Szybkie sumowanie odległości ścieżki z cache krawędzi."""
+        if not path or len(path) < 2:
+            return 0.0
+        return sum(
+            self.evaluator.edge_info_cache.get((u, v), ([], 1.0))[1]
+            for u, v in zip(path[:-1], path[1:], strict=False)
+        )
 
     def _log_operator_stats(self) -> None:
         """Wypisuje zestawienie skuteczności operatorów sąsiedztwa."""
@@ -423,6 +443,7 @@ class VNSLoopGenerator:
                 best_dist = s_dist
                 current_stage_wps = [list(s) for s in sample_wps]
 
+        # Jeśli po wszystkich próbach fallback nie spiął szkieletu bazowego:
         if not best_path:
             return [], -1.0
 

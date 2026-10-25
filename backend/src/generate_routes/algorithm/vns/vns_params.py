@@ -8,7 +8,7 @@ class VNSParams:
     target_distance: float
 
     # Główne pętle
-    max_iterations: int = 50
+    max_iterations: int = 80
     max_k: int = 4  # Skrócona, zwarta hierarchia sąsiedztw
     num_initial_samples: int = 3  # Liczba prób inicjalizacji szkieletu bazowego
 
