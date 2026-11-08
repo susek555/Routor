@@ -6,10 +6,12 @@ import redis.asyncio as aioredis
 from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel
 
+from src.api.exceptions.exceptions_handler import setup_exception_handlers
 from src.database.database import get_dummies
 from src.generate_routes.task import dummy_task
 
 app = FastAPI(title="Routor API")
+setup_exception_handlers(app)
 
 REDIS_URL = os.getenv("CELERY_BROKER_URL", "redis://routor_redis:6379/0")
 
@@ -31,18 +33,16 @@ async def check_db_connection():
             "data": rows,
         }
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Error connecting to database: {str(e)}"
-        ) from e
+        raise HTTPException(status_code=500, detail=f"Error connecting to database: {str(e)}") from e
+
 
 class TaskPayload(BaseModel):
     fcm_token: str
 
+
 @app.post("/dummy-task")
 async def dummy_task_endpoint(payload: TaskPayload, request: Request):
-    task = dummy_task.delay(
-        payload.fcm_token, request.client.host, "Message from api."
-    )
+    task = dummy_task.delay(payload.fcm_token, request.client.host, "Message from api.")
 
     return {
         "status": "Accepted",
@@ -63,9 +63,7 @@ async def websocket_endpoint(websocket: WebSocket):
 
     try:
         while True:
-            message = await pubsub.get_message(
-                ignore_subscribe_messages=True, timeout=1.0
-            )
+            message = await pubsub.get_message(ignore_subscribe_messages=True, timeout=1.0)
 
             if message:
                 raw_data = message["data"]

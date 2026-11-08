@@ -7,6 +7,7 @@ import redis
 
 from src.api.data.task_payload import TaskPayload
 from src.api.data.task_state import TaskState
+from src.app import REDIS_URL
 from src.database.database import get_single_dummy_message
 from src.firebase_notification import send_push_notification
 from src.generate_routes.worker_app import celery_app, redis_url
@@ -58,7 +59,8 @@ def dummy_task(fcm_token: str, ip: str, dummy_message: str):
 
 @celery_app.task(bind=True, name="generate_routes.generate")
 def generate_route_task(self, payload: TaskPayload):
-    logger.info(f"Starting route generation task for user {payload.user_id}...")
+    logger.info(f"Starting route generation task with ID {self.request.id} for user {payload.user_id}...")
+    r = redis.Redis.from_url(REDIS_URL)
 
 def update_task_state(task_id: str, payload: TaskState, r: redis.Redis):
     data = payload.model_dump_json()

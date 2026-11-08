@@ -2,21 +2,28 @@ import json
 import logging
 
 import redis.asyncio as aioredis
-from fastapi import WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, status
 
+from src.api.data.route_generation_response import RouteGenerationResponse
 from src.api.data.task_payload import TaskPayload
 from src.api.data.task_state import TaskStateEnum
+from src.api.services.routes_service import RouteService
 from src.app import REDIS_URL, app
-from src.generate_routes.task import generate_route_task
 
 logger = logging.getLogger(__name__)
 
 
-@app.post("/routes/generate")
-async def generate_route(payload: TaskPayload):
-    task = generate_route_task.delay(payload)
+router = APIRouter(prefix="/routes", tags=["Routes"])
 
-    logger.info(f"Route generation task started with ID: {task.id}")
+
+@router.post(
+    "/generate",
+    status_code=status.HTTP_202_ACCEPTED,
+    response_model=RouteGenerationResponse,
+)
+async def generate_route(payload: TaskPayload) -> RouteGenerationResponse:
+    task_id = RouteService.dispatch(payload)
+    return RouteGenerationResponse(task_id=task_id)
 
 
 # @app.post("/dummy-task")
