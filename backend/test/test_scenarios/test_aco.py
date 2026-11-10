@@ -4,7 +4,7 @@ import os
 
 import folium
 from folium import LayerControl
-from src.database.geo_point import GeoPoint
+from src.generate_routes.data.geo_point import GeoPoint
 from src.generate_routes.algorithm.aco.aco import ACO
 from src.generate_routes.algorithm.aco.aco_params import ACOParams
 from src.generate_routes.algorithm.evaluator import (

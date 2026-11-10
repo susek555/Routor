@@ -5,7 +5,7 @@ import time
 
 import folium
 from folium import LayerControl
-from src.database.geo_point import GeoPoint
+from src.generate_routes.data.geo_point import GeoPoint
 from src.generate_routes.algorithm.evaluator import RouteEvaluator
 from src.generate_routes.algorithm.common_utils import get_heading_rad, haversine
 from src.generate_routes.algorithm.evaluator_params import BoundingBoxEnum, EvaluatorParams

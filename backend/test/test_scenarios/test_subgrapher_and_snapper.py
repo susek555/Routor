@@ -3,7 +3,7 @@ import os
 import folium
 from folium import LayerControl
 
-from src.database.geo_point import GeoPoint
+from src.generate_routes.data.geo_point import GeoPoint
 from src.generate_routes.algorithm.checkpoint_refiner import CheckpointRefiner
 from src.generate_routes.algorithm.checkpoints_generator import CheckpointsGenerator
 from src.generate_routes.algorithm.snapper import Snapper

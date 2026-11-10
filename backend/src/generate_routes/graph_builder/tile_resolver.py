@@ -1,7 +1,7 @@
 import mercantile
 import osmnx as ox
 
-from src.database.geo_point import GeoPoint
+from src.generate_routes.data.geo_point import GeoPoint
 from src.generate_routes.data.tile_pointer import TilePointer
 
 

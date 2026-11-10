@@ -3,7 +3,7 @@ from dataclasses import dataclass, field
 import networkx as nx
 from shapely.geometry import LineString
 
-from src.database.geo_point import GeoPoint
+from src.generate_routes.data.geo_point import GeoPoint
 from src.generate_routes.data.map import Map
 
 

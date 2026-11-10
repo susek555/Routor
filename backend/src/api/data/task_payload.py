@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from src.database.geo_point import GeoPoint
+from src.generate_routes.data.geo_point import GeoPoint
 
 
 class TaskPayload(BaseModel):

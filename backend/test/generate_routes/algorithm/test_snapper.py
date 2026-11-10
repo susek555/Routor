@@ -2,7 +2,7 @@ from unittest.mock import patch
 
 import networkx as nx
 import pytest
-from src.database.geo_point import GeoPoint
+from src.generate_routes.data.geo_point import GeoPoint
 from src.generate_routes.algorithm.snapper import Snapper
 
 MODULE_PATH = Snapper.__module__

@@ -9,3 +9,4 @@ poland-latest.osm.pbf
 *.pkl
 *.tif
 *.html
+.env

@@ -2,7 +2,7 @@ import math
 from unittest.mock import patch
 
 import pytest
-from src.database.geo_point import GeoPoint
+from src.generate_routes.data.geo_point import GeoPoint
 from src.generate_routes.algorithm.checkpoints_generator import CheckpointsGenerator
 
 MODULE_PATH = CheckpointsGenerator.__module__

@@ -6,7 +6,7 @@ import folium
 import numpy as np
 import osmnx as ox
 from shapely.geometry import LineString
-from src.database.geo_point import GeoPoint
+from src.generate_routes.data.geo_point import GeoPoint
 from src.generate_routes.graph_builder.graph_builder import GraphBuilder
 
 ox.settings.use_cache = False

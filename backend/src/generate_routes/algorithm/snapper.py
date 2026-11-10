@@ -4,7 +4,7 @@ from typing import Any
 import numpy as np
 from scipy.spatial import KDTree
 
-from src.database.geo_point import GeoPoint
+from src.generate_routes.data.geo_point import GeoPoint
 from src.generate_routes.data.map import Map
 
 

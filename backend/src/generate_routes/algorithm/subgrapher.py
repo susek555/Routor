@@ -2,7 +2,7 @@ import math
 
 import networkx as nx
 
-from src.database.geo_point import GeoPoint
+from src.generate_routes.data.geo_point import GeoPoint
 from src.generate_routes.data.map import Map
 
 # Buffer radius around checkpoint endpoints to ensure multiple entry/exit streets

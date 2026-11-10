@@ -1,7 +1,7 @@
 import networkx as nx
 import osmnx as ox
 
-from src.database.geo_point import GeoPoint
+from src.generate_routes.data.geo_point import GeoPoint
 from src.generate_routes.data.map import Map
 from src.generate_routes.graph_builder.tile_loader import TileLoader
 from src.generate_routes.graph_builder.tile_resolver import TileResolver

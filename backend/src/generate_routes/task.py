@@ -6,10 +6,17 @@ import time
 import redis
 
 from src.api.data.task_payload import TaskPayload
-from src.api.data.task_state import FailedTaskStatePayload, ProgressTaskStatePayload, TaskState, TaskStateEnum
+from src.api.data.task_state import (
+    FailedTaskStatePayload,
+    ProgressTaskStatePayload,
+    TaskState,
+    TaskStateEnum,
+)
 from src.api.exceptions.exceptions import GraphGenerationError
 from src.app import REDIS_URL
 from src.database.database import get_single_dummy_message
+from src.database.dto.route import CalculatedVariantDTO
+from src.database.query.route import save_route_variants_sync
 from src.firebase_notification import send_push_notification
 from src.generate_routes.algorithm.checkpoint_refiner import CheckpointRefiner
 from src.generate_routes.algorithm.checkpoints_generator import CheckpointsGenerator
@@ -34,7 +41,6 @@ def dummy_task(fcm_token: str, ip: str, dummy_message: str):
     try:
         message_from_db = asyncio.run(get_single_dummy_message())
         print(f"Database communication successful. Retrieved: {message_from_db}")
-
     except Exception as e:
         print(f"CRITICAL ERROR: Failed to communicate with DB inside Celery: {str(e)}")
         raise e
@@ -52,7 +58,7 @@ def dummy_task(fcm_token: str, ip: str, dummy_message: str):
     r.publish("global_notifications", json.dumps(payload))
 
     # GOOGLE FIREBASE
-    send_push_notification(fcm_token, "Task has been finished", "Messege through google firebase")
+    send_push_notification(fcm_token, "Task has been finished", "Message through google firebase")
 
     print("Task finished!")
     return {
@@ -75,13 +81,12 @@ def update_task_state(task_id: str, payload: TaskState, r: redis.Redis):
     r.publish(channel, data)
 
 
-
 @celery_app.task(bind=True, name="generate_routes.generate")
 def generate_route_task(self, payload_dict: dict):
     payload = TaskPayload.model_validate(payload_dict)
     task_id = self.request.id
 
-    logger.info(f"Starting route generation task with ID {self.request.id} for user {payload.user_id}...")
+    logger.info(f"Starting route generation task with ID {task_id} for user {payload.user_id}...")
     r = redis.Redis.from_url(REDIS_URL)
 
     try:
@@ -107,7 +112,7 @@ def generate_route_task(self, payload_dict: dict):
 
         # --- 3. GENERATING ROUTES ---
         total_variants = 5
-        generated_routes_payload = []
+        calculated_variants: list[CalculatedVariantDTO] = []
 
         for route_idx in range(1, total_variants + 1):
             update_task_state(
@@ -160,47 +165,43 @@ def generate_route_task(self, payload_dict: dict):
             # Reconstruct the route geometry from node IDs and calculate the actual distance
             reconstructed_pts, actual_distance = converter.reconstruct_route_from_node_ids(route_nodes)
 
-            # Formatowanie geometrii pod GeoJSON / aplikację mobilną
-            # Zakładamy GeoPoint -> [lon, lat] lub [lat, lon] zależnie od MapLibre
+            # MapLibre GeoJSON coordinates standard: [longitude, latitude]
             coordinates = [[pt.longitude, pt.latitude] for pt in reconstructed_pts]
 
-            generated_routes_payload.append(
-                {
-                    "variant_id": route_idx,
-                    "distance_meters": actual_distance,
-                    "fitness": float(route_fitness),
-                    "geometry": {
+            calculated_variants.append(
+                CalculatedVariantDTO(
+                    variant_index=route_idx,
+                    distance_meters=int(round(actual_distance)),
+                    fitness_score=float(route_fitness),
+                    geojson={
                         "type": "LineString",
                         "coordinates": coordinates,
                     },
-                }
+                )
             )
 
-        if not generated_routes_payload:
+        if not calculated_variants:
             raise RuntimeError("Failed to generate any valid route variant for given parameters.")
 
-        # --- 4. ZAPIS DO BAZY DANYCH (TYMCZASOWY BUFOR) ---
-        # with SessionLocal() as db_session:
-        #     db_route = GeneratedRoute(
-        #         task_id=task_id,
-        #         user_id=payload.user_id,
-        #         routes_data=generated_routes_payload,
-        #     )
-        #     db_session.add(db_route)
-        #     db_session.commit()
+        # --- 4. SAVE TO DATABASE ---
+        save_route_variants_sync(
+            task_id=task_id,
+            user_id=payload.user_id,
+            variants=calculated_variants,
+        )
 
         # --- 5. TASK FINISHED ---
         update_task_state(task_id, TaskState(state=TaskStateEnum.COMPLETED), r)
 
-        # --- 6. POWIADOMIENIE PUSH (GOOGLE FIREBASE) ---
+        # --- 6. PUSH NOTIFICATION (FIREBASE) ---
         # if payload.fcm_token:
         #     send_push_notification(
         #         fcm_token=payload.fcm_token,
         #         title="Trasy są gotowe!",
-        #         body=f"Wygenerowano {len(generated_routes_payload)} alternatywnych propozycji treningu.",
+        #         body=f"Wygenerowano {len(calculated_variants)} alternatywnych propozycji treningu.",
         #     )
 
-        logger.info(f"Route task {task_id} completed. Generated {len(generated_routes_payload)} routes.")
+        logger.info(f"Route task {task_id} completed. Generated {len(calculated_variants)} routes.")
 
     except Exception as exc:
         logger.exception(f"Fatal error during route generation for {task_id}")
