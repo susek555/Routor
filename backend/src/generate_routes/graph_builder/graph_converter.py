@@ -196,59 +196,98 @@ class GraphConverter:
         largest_component_nodes = max(nx.weakly_connected_components(graph), key=len)
         return graph.subgraph(largest_component_nodes).copy()
 
-    def reconstruct_route_from_node_ids(self, simplified_node_path: list[int]) -> list[GeoPoint]:
-        """
-        Reconstructs high-fidelity map geometry from simplified graph node IDs in O(K) time:
+    def reconstruct_route_from_node_ids(
+        self, simplified_node_path: list[int]
+    ) -> tuple[list[GeoPoint], int]:
+        """Reconstructs high-fidelity map geometry and calculates total route distance in O(K) time.
+
         1. Expands macro-edges into the full sequence of original graph node IDs.
-        2. Retrieves the exact LineString geometry directly from original_map edges.
+        2. Retrieves the exact LineString geometry and sums edge lengths directly from original_map.
+
+        Returns:
+            tuple[list[GeoPoint], int]: A tuple containing the list of coordinates and the total length in meters.
         """
         if len(simplified_node_path) < self.MIN_NODE_CHAIN_TO_PRESERVE:
-            return [
+            points = [
                 GeoPoint(
                     latitude=self.original_map.nodes[node_id]["y"],
                     longitude=self.original_map.nodes[node_id]["x"],
                 )
                 for node_id in simplified_node_path
             ]
+            return points, 0.0
 
-        graph_to_lookup = self.simplified_map if self.simplified_map is not None else self.original_map
+        graph_to_lookup = (
+            self.simplified_map
+            if self.simplified_map is not None
+            else self.original_map
+        )
 
         # Step 1: Expand simplified edges into the complete chain of original nodes
         full_node_chain: list[int] = []
-        for segment_start, segment_end in zip(simplified_node_path[:-1], simplified_node_path[1:], strict=False):
-            macro_edge_variants = graph_to_lookup.get_edge_data(segment_start, segment_end)
+        for segment_start, segment_end in zip(
+            simplified_node_path[:-1], simplified_node_path[1:], strict=False
+        ):
+            macro_edge_variants = graph_to_lookup.get_edge_data(
+                segment_start, segment_end
+            )
             if not macro_edge_variants:
                 continue
 
-            shortest_macro_variant = min(macro_edge_variants.values(), key=lambda edge: edge.get("length", 0.0))
-            intermediate_nodes = shortest_macro_variant.get("path_nodes", [segment_start, segment_end])
+            shortest_macro_variant = min(
+                macro_edge_variants.values(),
+                key=lambda edge: edge.get("length", 0.0),
+            )
+            intermediate_nodes = shortest_macro_variant.get(
+                "path_nodes", [segment_start, segment_end]
+            )
 
             if not full_node_chain:
                 full_node_chain.extend(intermediate_nodes)
             else:
                 full_node_chain.extend(intermediate_nodes[1:])
 
-        # Step 2: Fetch exact road bend geometry from original graph edges
+        # Step 2: Fetch exact road bend geometry and accumulate lengths from original graph edges
         full_coordinates: list[tuple[float, float]] = []
+        total_distance_meters = 0.0
         original_graph = self.original_map
 
-        for step_start, step_end in zip(full_node_chain[:-1], full_node_chain[1:], strict=False):
+        for step_start, step_end in zip(
+            full_node_chain[:-1], full_node_chain[1:], strict=False
+        ):
             edge_data_variants = original_graph.get_edge_data(step_start, step_end)
             if not edge_data_variants:
                 segment_points = [
-                    (original_graph.nodes[step_start]["y"], original_graph.nodes[step_start]["x"]),
-                    (original_graph.nodes[step_end]["y"], original_graph.nodes[step_end]["x"]),
+                    (
+                        original_graph.nodes[step_start]["y"],
+                        original_graph.nodes[step_start]["x"],
+                    ),
+                    (
+                        original_graph.nodes[step_end]["y"],
+                        original_graph.nodes[step_end]["x"],
+                    ),
                 ]
             else:
-                shortest_original_edge = min(edge_data_variants.values(), key=lambda edge: edge.get("length", 0.0))
-                geometry = shortest_original_edge.get("geometry")
+                shortest_original_edge = min(
+                    edge_data_variants.values(),
+                    key=lambda edge: edge.get("length", 0.0),
+                )
+                # Accumulate accurate segment length stored in OSM attributes
+                total_distance_meters += shortest_original_edge.get("length", 0.0)
 
+                geometry = shortest_original_edge.get("geometry")
                 if isinstance(geometry, LineString):
                     segment_points = [(lat, lon) for lon, lat in geometry.coords]
                 else:
                     segment_points = [
-                        (original_graph.nodes[step_start]["y"], original_graph.nodes[step_start]["x"]),
-                        (original_graph.nodes[step_end]["y"], original_graph.nodes[step_end]["x"]),
+                        (
+                            original_graph.nodes[step_start]["y"],
+                            original_graph.nodes[step_start]["x"],
+                        ),
+                        (
+                            original_graph.nodes[step_end]["y"],
+                            original_graph.nodes[step_end]["x"],
+                        ),
                     ]
 
             if not full_coordinates:
@@ -256,4 +295,7 @@ class GraphConverter:
             else:
                 full_coordinates.extend(segment_points[1:])
 
-        return [GeoPoint(latitude=lat, longitude=lon) for lat, lon in full_coordinates]
+        geopoints = [
+            GeoPoint(latitude=lat, longitude=lon) for lat, lon in full_coordinates
+        ]
+        return geopoints, int(total_distance_meters)

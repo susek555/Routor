@@ -21,8 +21,8 @@ class BoundingBoxEnum(Enum):
 
 @dataclass(frozen=True)
 class EvaluatorParams:
-    distance_penalty_weight: float
-    overlap_penalty_weight: float
+    distance_penalty_weight: float = 2.0
+    overlap_penalty_weight: float = 5.0
 
     # Bounding box for spatial overlap detection
     bounding_box: BoundingBox = field(default_factory=lambda: BoundingBoxEnum.M_80.value)
