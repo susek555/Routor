@@ -1,9 +1,9 @@
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel
 
 
-class TaskStateEnum(Enum):
+class TaskStateEnum(StrEnum):
     LOADING_GRAPH = "LOADING_GRAPH"
     SIMPLIFYING_GRAPH = "SIMPLIFYING_GRAPH"
     GENERATING_ROUTE = "GENERATING_ROUTE"

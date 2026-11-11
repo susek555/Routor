@@ -172,7 +172,7 @@ class TestGraphConverterIntegration:
         assert 1 in simplified_protected.nodes
 
     def test_reconstruct_route_with_linestring_geometry(self, empty_map):
-        """Verifies geometric reconstruction using underlying LineString data."""
+        """Verifies geometric reconstruction using underlying LineString data and length calculation."""
         # Node 1 -> Node 2 with intermediate curvature stored in LineString
         empty_map.add_node(1, x=21.0, y=52.0)
         empty_map.add_node(2, x=21.2, y=52.2)
@@ -183,13 +183,14 @@ class TestGraphConverterIntegration:
         converter = GraphConverter(original_map=empty_map)
         converter.simplified_map = empty_map
 
-        route = converter.reconstruct_route_from_node_ids([1, 2])
+        route, distance = converter.reconstruct_route_from_node_ids([1, 2])
 
         assert len(route) == 3
         assert all(isinstance(pt, GeoPoint) for pt in route)
         assert (route[0].latitude, route[0].longitude) == (52.0, 21.0)
         assert (route[1].latitude, route[1].longitude) == (52.05, 21.1)
         assert (route[2].latitude, route[2].longitude) == (52.2, 21.2)
+        assert distance == 150
 
     def test_reconstruct_route_fallback_to_node_coords_when_no_linestring(self, linear_corridor_map):
         """Falls back to straight node coordinates when edges lack LineString geometry."""
@@ -197,19 +198,21 @@ class TestGraphConverterIntegration:
         converter.convert_graph_to_algorithm()
 
         # Reconstruct path from simplified end nodes [1, 4]
-        route = converter.reconstruct_route_from_node_ids([1, 4])
+        route, distance = converter.reconstruct_route_from_node_ids([1, 4])
 
         assert len(route) == 4
         assert [pt.latitude for pt in route] == [52.0, 52.1, 52.2, 52.3]
         assert [pt.longitude for pt in route] == [21.0, 21.1, 21.2, 21.3]
+        assert distance >= 0
 
     def test_reconstruct_route_single_or_empty_node_path(self, empty_map):
         """Returns direct point representations when path length is below minimum preservation threshold."""
         empty_map.add_node(10, x=21.01, y=52.22)
         converter = GraphConverter(original_map=empty_map)
 
-        route = converter.reconstruct_route_from_node_ids([10])
+        route, distance = converter.reconstruct_route_from_node_ids([10])
 
         assert len(route) == 1
         assert route[0].latitude == 52.22
         assert route[0].longitude == 21.01
+        assert distance == 0
