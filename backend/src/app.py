@@ -1,54 +1,19 @@
 import asyncio
 import json
-import os
 
 import redis.asyncio as aioredis
-from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel
 
 from src.api.exceptions.exceptions_handler import setup_exception_handlers
-from src.database.database import get_dummies
-from src.generate_routes.task import dummy_task
+from src.generate_routes.worker_app import REDIS_URL
 
 app = FastAPI(title="Routor API")
 setup_exception_handlers(app)
 
-REDIS_URL = os.getenv("CELERY_BROKER_URL", "redis://routor_redis:6379/0")
-
-
-@app.get("/dummy")
-def get_dummy():
-    return {"message": "Dummy"}
-
-
-@app.get("/healthcheck-db")
-async def check_db_connection():
-    try:
-        rows = await get_dummies()
-
-        return {
-            "status": "ok",
-            "database": "connected",
-            "records_count": len(rows),
-            "data": rows,
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error connecting to database: {str(e)}") from e
-
 
 class TaskPayload(BaseModel):
     fcm_token: str
-
-
-@app.post("/dummy-task")
-async def dummy_task_endpoint(payload: TaskPayload, request: Request):
-    task = dummy_task.delay(payload.fcm_token, request.client.host, "Message from api.")
-
-    return {
-        "status": "Accepted",
-        "message": "Dummy task started in the background.",
-        "task_id": task.id,
-    }
 
 
 @app.websocket("/ws/notifications")

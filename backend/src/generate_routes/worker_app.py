@@ -2,8 +2,8 @@ import os
 
 from celery import Celery
 
-redis_url = os.getenv("CELERY_BROKER_URL", "redis://localhost:6379/0")
-celery_app = Celery("routor_tasks", broker=redis_url, backend=redis_url)
+REDIS_URL = os.getenv("CELERY_BROKER_URL", "redis://routor_redis:6379/0")
+celery_app = Celery("routor_tasks", broker=REDIS_URL, backend=REDIS_URL)
 
 celery_app.conf.update(
     imports=["src.generate_routes.task"],

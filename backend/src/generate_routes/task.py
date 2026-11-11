@@ -13,8 +13,6 @@ from src.api.data.task_state import (
     TaskStateEnum,
 )
 from src.api.exceptions.exceptions import GraphGenerationError
-from src.app import REDIS_URL
-from src.database.database import get_single_dummy_message
 from src.database.dto.route import CalculatedVariantDTO
 from src.database.query.route import save_route_variants_sync
 from src.firebase_notification import send_push_notification
@@ -28,45 +26,9 @@ from src.generate_routes.algorithm.vns.vns_generator import VNSLoopGenerator
 from src.generate_routes.algorithm.vns.vns_params import VNSParams
 from src.generate_routes.graph_builder.graph_builder import GraphBuilder
 from src.generate_routes.graph_builder.graph_converter import GraphConverter
-from src.generate_routes.worker_app import celery_app, redis_url
+from src.generate_routes.worker_app import REDIS_URL, celery_app
 
 logger = logging.getLogger(__name__)
-
-
-@celery_app.task(name="generate_routes.dummy_task")
-def dummy_task(fcm_token: str, ip: str, dummy_message: str):
-    print(f"Starting heavy task for user {ip}...")
-    time.sleep(10)
-
-    try:
-        message_from_db = asyncio.run(get_single_dummy_message())
-        print(f"Database communication successful. Retrieved: {message_from_db}")
-    except Exception as e:
-        print(f"CRITICAL ERROR: Failed to communicate with DB inside Celery: {str(e)}")
-        raise e
-
-    r = redis.Redis.from_url(redis_url)
-    payload = {
-        "event": "DUMMY_TASK_PERFORMED",
-        "status": "success",
-        "user_ip": ip,
-        "message": "Message from worker through redis websocket.",
-    }
-
-    # REDIS
-    print("Publishing notification to Redis channel...")
-    r.publish("global_notifications", json.dumps(payload))
-
-    # GOOGLE FIREBASE
-    send_push_notification(fcm_token, "Task has been finished", "Message through google firebase")
-
-    print("Task finished!")
-    return {
-        "status": "success",
-        "user_ip": ip,
-        "message_api": dummy_message,
-        "message_database": message_from_db,
-    }
 
 
 def update_task_state(task_id: str, payload: TaskState, r: redis.Redis):

@@ -15,6 +15,7 @@ services:
         WORKDIR /app
 
         COPY --chown=routor_user:routor_user pyproject.toml uv.lock ./
+        COPY --chown=routor_user:routor_user src/ ./src/
 
         RUN --mount=type=cache,target=/root/.cache/uv \
             uv sync --locked --no-install-project --no-dev

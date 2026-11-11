@@ -1,4 +1,5 @@
 from pydantic import BaseModel
+
 from src.generate_routes.data.geo_point import GeoPoint
 
 

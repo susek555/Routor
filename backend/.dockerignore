@@ -27,8 +27,6 @@ split_pbfs/
 .split_pbfs/
 **/split_pbfs/
 **/.split_pbfs/
-data/
-**/data/
 
 *.pbf
 *.osm

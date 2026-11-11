@@ -10,10 +10,11 @@ from src.api.data.route_generation_response import RouteGenerationResponse
 from src.api.data.task_payload import TaskPayload
 from src.api.data.task_state import TaskStateEnum
 from src.api.services.routes_service import RouteService
-from src.app import REDIS_URL, app
+from src.app import app
 from src.database.database import get_db
 from src.database.query.route import get_route_variants_by_task_id
 from src.database.schemas.route import RouteVariantResponse, TaskRouteVariantsResponse
+from src.generate_routes.worker_app import REDIS_URL
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/routes", tags=["Routes"])
@@ -130,7 +131,6 @@ async def get_task_routes(
 ):
     """Retrieves all generated route variants for a given task."""
     variants = await get_route_variants_by_task_id(db, task_id)
-
 
     return TaskRouteVariantsResponse(
         task_id=task_id,
