@@ -1,7 +1,4 @@
-import asyncio
-import json
 import logging
-import time
 
 import redis
 
@@ -26,15 +23,15 @@ from src.generate_routes.algorithm.vns.vns_generator import VNSLoopGenerator
 from src.generate_routes.algorithm.vns.vns_params import VNSParams
 from src.generate_routes.graph_builder.graph_builder import GraphBuilder
 from src.generate_routes.graph_builder.graph_converter import GraphConverter
-from src.generate_routes.worker_app import REDIS_URL, celery_app
+from src.generate_routes.worker_app import REDIS_URL, celery_app, ws_channel_prefix, ws_state_key_prefix
 
 logger = logging.getLogger(__name__)
 
 
 def update_task_state(task_id: str, payload: TaskState, r: redis.Redis):
     data = payload.model_dump_json()
-    state_key = f"routes:state:{task_id}"
-    channel = f"routes:{task_id}"
+    state_key = f"{ws_state_key_prefix}:{task_id}"
+    channel = f"{ws_channel_prefix}:{task_id}"
 
     # TTL = 30 minutes
     r.set(state_key, data, ex=1800)
@@ -65,6 +62,7 @@ def generate_route_task(self, payload_dict: dict):
 
         # --- 2. SIMPLIFYING GRAPH ---
         update_task_state(task_id, TaskState(state=TaskStateEnum.SIMPLIFYING_GRAPH), r)
+        logger.info(f"Graph loaded with {len(raw_graph.nodes)} nodes and {len(raw_graph.edges)} edges.")
         converter = GraphConverter(original_map=raw_graph)
         simple_graph = converter.convert_graph_to_algorithm()
 
@@ -151,6 +149,7 @@ def generate_route_task(self, payload_dict: dict):
             user_id=payload.user_id,
             variants=calculated_variants,
         )
+        logger.info(f"Saved {len(calculated_variants)} route variants to the database for task {task_id}.")
 
         # --- 5. TASK FINISHED ---
         update_task_state(task_id, TaskState(state=TaskStateEnum.COMPLETED), r)
