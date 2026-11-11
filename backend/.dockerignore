@@ -1,8 +1,53 @@
-.venv/
-test/
+# Git and IDE
+.git/
+.gitignore
 .vscode/
+.idea/
+
+# VENV
+.venv/
+venv/
+ENV/
+env/
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+**/*.pyd
 .pytest_cache/
+.ruff_cache/
+test/
+tests/
+
+# MAP
+tiles_data/
 .tiles_data/
-poland-latest.osm.pbf
+**/tiles_data/
+**/.tiles_data/
+split_pbfs/
+.split_pbfs/
+**/split_pbfs/
+**/.split_pbfs/
+data/
+**/data/
+
 *.pbf
+*.osm
 *.pkl
+*.pickle
+*.graphml
+*.geojson
+*.geoparquet
+*.gpkg
+*.tif
+*.tiff
+
+# Database and cache
+cache/
+.cache/
+**/cache/
+**/.cache/
+postgres_data/
+**/postgres_data/
+*.log
+*.db
+*.sqlite3
