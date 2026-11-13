@@ -16,8 +16,8 @@ import io.ktor.http.ContentType
 import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.json.Json
-import routor.src.network.api.DummyApi
-import routor.src.network.api.createDummyApi
+import routor.src.network.api.RouteApi
+import routor.src.network.api.createRouteApi
 import javax.inject.Singleton
 
 
@@ -27,7 +27,7 @@ object NetworkModule {
     // TODO move it to config file
     private const val BASE_URL = "geographic-photographers-backing-fitting.trycloudflare.com"
     private const val BASE_HTTPS_URL = "https://$BASE_URL/"
-    private const val BASE_WS_URL = "ws://$BASE_URL/ws/notifications"
+    private const val BASE_WS_URL = "ws://$BASE_URL/"
 
     @Provides
     @Singleton
@@ -64,13 +64,13 @@ object NetworkModule {
     fun provideWebSocketService(): WebSocketService {
         return WebSocketService(
             httpClient = provideHttpClient(),
-            BASE_WS_URL = BASE_WS_URL
+            baseUrl = BASE_WS_URL
         )
     }
 
     @Provides
     @Singleton
-    fun provideDummyApi(ktorfit: Ktorfit): DummyApi {
-        return ktorfit.createDummyApi()
+    fun provideRouteApi(ktorfit: Ktorfit): RouteApi {
+        return ktorfit.createRouteApi()
     }
 }

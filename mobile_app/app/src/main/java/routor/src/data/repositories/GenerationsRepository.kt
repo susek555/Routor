@@ -1,44 +1,56 @@
 package routor.src.data.repositories
 
-import kotlinx.coroutines.tasks.await
 import com.google.firebase.messaging.FirebaseMessaging
 import kotlinx.coroutines.flow.Flow
-import routor.src.network.MyNotification
+import kotlinx.coroutines.tasks.await
+import org.maplibre.android.geometry.LatLng
 import routor.src.network.WebSocketService
-import routor.src.network.api.DummyApi
-import routor.src.network.api.TaskPayload
-import routor.src.network.api.TaskResponse
+import routor.src.network.api.RouteApi
+import routor.src.network.api.types.route.GetVariantsResponse
+import routor.src.network.api.types.route.PostGenerateRouteTaskPayload
+import routor.src.network.api.types.route.PostGenerateRouteTaskResponse
+import routor.src.network.api.types.route.RouteGenerationTaskStatus
+import routor.src.state.GenerationsInfoHolder
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
 class GenerationsRepository @Inject constructor(
-    private val generationsApi: DummyApi,
-    private val webSocketService: WebSocketService
-){
+    private val routeApi: RouteApi,
+    private val webSocketService: WebSocketService,
+    private val generationsInfoHolder: GenerationsInfoHolder
+) {
+    //TODO prints to logs
 
-    suspend fun triggerDummyTask() : TaskResponse {
-        return try {
-            val fcmToken = FirebaseMessaging.getInstance().token.await()
-            // TODO remove prints
-            println("Downloaded device token: $fcmToken")
-
-            // TODO connect token handling to userId (maybe)
-            val payload = TaskPayload(
-                fcm_token = fcmToken
-            )
-
-            val response = generationsApi.triggerDummyTask(payload)
-            println("API received task: ${response.status}")
-
-            response
-        } catch (e: Exception) {
-            println("Error during fetching token or API call: ${e.localizedMessage}")
-            throw e
+    suspend fun startRouteGeneration(
+        center: LatLng,
+        targetDistanceMeters: Float
+    ): String {
+        val fcmToken = runCatching {
+            FirebaseMessaging.getInstance().token.await()
+        }.getOrElse { e ->
+            println("Warning: Could not fetch FCM token (${e.localizedMessage}), using empty fallback")
+            ""
         }
+
+        val payload = PostGenerateRouteTaskPayload(
+            fcmToken = fcmToken,
+            userId = generationsInfoHolder.usedId,
+            center = center,
+            targetDistance = targetDistanceMeters
+        )
+
+        val response: PostGenerateRouteTaskResponse = routeApi.postGenerateRouteTask(payload)
+        println("API created route generation task: ${response.taskId}")
+        return response.taskId
     }
 
-    fun listenToRouteUpdates(): Flow<MyNotification> {
-        return webSocketService.observeNotifications()
+    fun observeTaskProgress(taskId: String): Flow<RouteGenerationTaskStatus> {
+        return webSocketService.observeRouteGeneration(taskId)
+    }
+
+    suspend fun getRouteVariants(taskId: String): List<GetVariantsResponse.RouteVariantDto> {
+        val response = routeApi.getVariants(taskId)
+        return response.variants.sortedBy { it.variantIndex }
     }
 }

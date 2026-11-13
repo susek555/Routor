@@ -15,7 +15,7 @@ import routor.src.network.api.types.route.RouteGenerationTaskStatusEnum
 
 class WebSocketService(
     private val httpClient: HttpClient,
-    private val baseWsUrl: String
+    private val baseUrl: String
 ) {
     private val json = Json {
         ignoreUnknownKeys = true
@@ -25,7 +25,7 @@ class WebSocketService(
     //TODO prints to logs
 
     fun observeRouteGeneration(taskId: String): Flow<RouteGenerationTaskStatus> = flow {
-        val url = "${baseWsUrl.trimEnd('/')}/routes/ws/$taskId"
+        val url = "${baseUrl.trimEnd('/')}routes/ws/$taskId"
 
         try {
             httpClient.webSocket(urlString = url) {
