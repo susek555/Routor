@@ -39,7 +39,6 @@ import routor.src.utils.formatTime
 @Composable
 fun MainScreen(
     displayRoutesScreen: () -> Unit,
-    displayGenerationsScreen: () -> Unit,
     viewModel: MainViewModel
 ) {
     // UI state from viewModel
@@ -90,27 +89,6 @@ fun MainScreen(
                 factory = { mapView },
                 update = {}
             )
-            if (!uiState.isRecording) {
-
-                //TODO rearrange to NavBar
-                Button(
-                    modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .offset(x = (-20).dp, y = 40.dp),
-                    onClick = displayGenerationsScreen
-                ) {
-                    Text("Generate")
-                }
-
-                Button(
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .offset(x = (-20).dp, y = 40.dp),
-                    onClick = displayRoutesScreen
-                ) {
-                    Text("My Routes")
-                }
-            }
             FloatingActionButton(
                 onClick = {viewModel.onEvent(MainScreenEvent.CenterMapOnCurrentLocation)},
                 modifier = Modifier

@@ -27,10 +27,12 @@ import routor.src.data.repositories.LocationRepository
 import routor.src.data.repositories.RouteRepository
 import routor.src.data.types.Route
 import routor.src.location.LocationService
+import routor.src.state.ActiveRideHolder
 import javax.inject.Inject
 
 @HiltViewModel
 class MainViewModel @Inject constructor(
+    private val activeRideHolder: ActiveRideHolder,
     private val locationRepository: LocationRepository,
     private val routeRepository: RouteRepository,
     private val dialogFactory: ConfirmDialogFactory,
@@ -40,8 +42,7 @@ class MainViewModel @Inject constructor(
     private val MINIMUM_NUMBER_OF_POINTS = 10
 
     // recording route toggle
-    private val _isServiceRecordingRoute = MutableStateFlow(false)
-    val isServiceRecordingRoute = _isServiceRecordingRoute.asStateFlow()
+    val isServiceRecordingRoute = activeRideHolder.isRecording
 
     // currently recorded route
     private var currentRoute: MutableStateFlow<Route?> = MutableStateFlow(null)
@@ -68,7 +69,7 @@ class MainViewModel @Inject constructor(
         locationRepository.currentLocation,
         locationRepository.routeStatsFlow,
         locationRepository.duration,
-        _isServiceRecordingRoute,
+        isServiceRecordingRoute,
         combine(_isStopRouteDialogOpen, _stopRouteDialogConfig) { isVisible, config ->
             ConfirmDialogState(isVisible, config)
         }
@@ -79,7 +80,7 @@ class MainViewModel @Inject constructor(
      init {
          // center map on user location
          viewModelScope.launch {
-             if (!_isServiceRecordingRoute.value){
+             if (!isServiceRecordingRoute.value){
                  sendActionToLocationService(LocationService.ACTION_GET_SINGLE_LOCATION)
 
                  // wait for location to appear
@@ -99,19 +100,19 @@ class MainViewModel @Inject constructor(
                 _isStopRouteDialogOpen.value = true
             }
             MainScreenEvent.StartRoute -> {
-                if(!_isServiceRecordingRoute.value){
+                if(!isServiceRecordingRoute.value){
                     startRecording()
                 }
             }
             is MainScreenEvent.SaveRoute -> {
-                if(_isServiceRecordingRoute.value){
+                if(isServiceRecordingRoute.value){
                     viewModelScope.launch { saveRoute(name = event.name) }
                     stopRecording()
                     _isStopRouteDialogOpen.value = false
                 }
             }
             MainScreenEvent.CancelRoute -> {
-                if(_isServiceRecordingRoute.value){
+                if(isServiceRecordingRoute.value){
                     viewModelScope.launch { cancelRoute() }
                     stopRecording()
                     _isStopRouteDialogOpen.value = false
@@ -120,7 +121,7 @@ class MainViewModel @Inject constructor(
             MainScreenEvent.CenterMapOnCurrentLocation -> {
                 locationRepository.currentLocation.value?.let {
                     viewModelScope.launch { _centerMapEvent.emit(locationRepository.currentLocation.value!!) }
-                    if (!_isServiceRecordingRoute.value){
+                    if (!isServiceRecordingRoute.value){
                         sendActionToLocationService(LocationService.ACTION_GET_SINGLE_LOCATION)
                     }
                 }
@@ -176,13 +177,13 @@ class MainViewModel @Inject constructor(
             locationRepository.startRecording(routeId)
 
             sendActionToLocationService(LocationService.ACTION_START_RECORDING)
-            _isServiceRecordingRoute.value = true
+            activeRideHolder.setRecording(true)
         }
     }
 
     private fun stopRecording(){
         sendActionToLocationService(LocationService.ACTION_STOP_RECORDING)
-        _isServiceRecordingRoute.value = false
+        activeRideHolder.setRecording(false)
         locationRepository.stopRecording()
     }
 

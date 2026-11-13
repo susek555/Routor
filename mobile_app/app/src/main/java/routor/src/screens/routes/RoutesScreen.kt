@@ -21,7 +21,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 @Composable
 fun RoutesScreen(
-    displayMainScreen: () -> Unit,
     displayRouteDetailsScreen: (Long) -> Unit,
     viewModel: RoutesViewModel
 ){
@@ -30,13 +29,6 @@ fun RoutesScreen(
     // TODO make it prettier
 
     Scaffold(
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = displayMainScreen
-            ) {
-                Text("BACK")
-            }
-        }
     ) { padding ->
         LazyColumn(
             contentPadding = padding,

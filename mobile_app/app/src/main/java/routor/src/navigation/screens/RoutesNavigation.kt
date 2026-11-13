@@ -16,15 +16,11 @@ fun NavController.navigateToRoutes() {
 }
 
 fun NavGraphBuilder.routesScreen(
-    onNavigateToMain: () -> Unit,
     onNavigateToRouteDetails: (Long) -> Unit
 ) {
     composable<RoutesNavRoute> { backStackEntry ->
         RoutesScreen(
             viewModel = hiltViewModel<RoutesViewModel>(backStackEntry),
-            displayMainScreen = {
-                onNavigateToMain()
-            },
             displayRouteDetailsScreen = { id ->
                 onNavigateToRouteDetails(id)
             }

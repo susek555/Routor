@@ -16,14 +16,12 @@ fun NavController.navigateToMain() {
 }
 
 fun NavGraphBuilder.mainScreen(
-    onNavigateToRoutes: () -> Unit,
-    onNavigateToGenerations: () -> Unit
+    onNavigateToRoutes: () -> Unit
 ) {
     composable<MainNavRoute> { backStackEntry ->
         MainScreen(
             viewModel = hiltViewModel<MainViewModel>(backStackEntry),
-            displayRoutesScreen = onNavigateToRoutes,
-            displayGenerationsScreen = onNavigateToGenerations
+            displayRoutesScreen = onNavigateToRoutes
         )
     }
 }
