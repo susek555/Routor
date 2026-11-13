@@ -1,4 +1,4 @@
-package routor.src.state.types
+package routor.src.network.api.types.route
 
 import kotlinx.serialization.DeserializationStrategy
 import kotlinx.serialization.SerialName
