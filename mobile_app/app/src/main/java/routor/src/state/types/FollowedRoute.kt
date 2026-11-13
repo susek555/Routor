@@ -4,5 +4,5 @@ import org.maplibre.android.geometry.LatLng
 
 data class FollowedRoute(
     val points: List<LatLng>,
-    val distanceMeters: Int
+    val distanceMeters: Double
 ) {}

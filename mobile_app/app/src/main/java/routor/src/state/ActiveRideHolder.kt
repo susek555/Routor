@@ -15,7 +15,7 @@ class ActiveRideHolder @Inject constructor() {
     private val _isRecording = MutableStateFlow(false)
     val isRecording: StateFlow<Boolean> = _isRecording.asStateFlow()
 
-    fun setPlannedRoute(route: FollowedRoute?) {
+    fun setFollowedRoute(route: FollowedRoute?) {
         _followedRoute.value = route
     }
 
