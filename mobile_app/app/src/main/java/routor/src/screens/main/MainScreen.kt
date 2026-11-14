@@ -35,6 +35,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import routor.src.dialogFactory.confirmDialog.ConfirmDialog
 import routor.src.data.types.RouteStats
+import routor.src.dialogFactory.infoDialog.InfoDialog
 import routor.src.utils.MapHelper
 import routor.src.utils.formatTime
 
@@ -53,10 +54,17 @@ fun MainScreen(
     }
     MapHelper.SetupMapLifecycleEvents(mapView)
 
-    //map center on request
+    // map center on request
     LaunchedEffect(Unit) {
         viewModel.centerMapEvent.collect { location ->
             MapHelper.centerCameraOnUserLocation(mapView, location)
+        }
+    }
+
+    // navigate to route details when route is saved
+    LaunchedEffect(Unit) {
+        viewModel.navigateToDetailsEvent.collect { savedRouteId ->
+            displayRoutesDetailsScreen(savedRouteId)
         }
     }
 
@@ -186,6 +194,10 @@ fun MainScreen(
     }
     if(uiState.dialogState.isVisible){
         ConfirmDialog(uiState.dialogState.config!!)
+    }
+
+    if (uiState.infoDialogState.isVisible && uiState.infoDialogState.config != null) {
+        InfoDialog(uiState.infoDialogState.config!!)
     }
 }
 

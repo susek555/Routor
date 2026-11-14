@@ -15,7 +15,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.asSharedFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
@@ -24,8 +23,13 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import org.maplibre.android.geometry.LatLng
 import routor.src.data.repositories.LocationRepository
+import routor.src.data.repositories.PlannedRoutesRepository
 import routor.src.data.repositories.RouteRepository
+import routor.src.data.types.PlannedRoute
 import routor.src.data.types.Route
+import routor.src.dialogFactory.infoDialog.InfoDialogConfigState
+import routor.src.dialogFactory.infoDialog.InfoDialogState
+import routor.src.dialogFactory.infoDialog.InfoDialogFactory
 import routor.src.location.LocationService
 import routor.src.state.ActiveRideHolder
 import javax.inject.Inject
@@ -35,7 +39,9 @@ class MainViewModel @Inject constructor(
     private val activeRideHolder: ActiveRideHolder,
     private val locationRepository: LocationRepository,
     private val routeRepository: RouteRepository,
+    private val plannedRoutesRepository: PlannedRoutesRepository,
     private val dialogFactory: ConfirmDialogFactory,
+    private val infoDialogFactory: InfoDialogFactory,
     @ApplicationContext private val context: Context,
 ) : ViewModel() {
     // Constant
@@ -48,6 +54,7 @@ class MainViewModel @Inject constructor(
     private var currentRoute: MutableStateFlow<Route?> = MutableStateFlow(null)
 
     // end route dialogs state
+    private val _isSavingRoute = MutableStateFlow(false)
     private val _isStopRouteDialogOpen = MutableStateFlow(false)
     private val _stopRouteDialogConfig = MutableStateFlow<ConfirmDialogConfig?>(
         dialogFactory.create(
@@ -64,6 +71,9 @@ class MainViewModel @Inject constructor(
     private val _centerMapEvent = MutableSharedFlow<LatLng>(replay = 0)
     val centerMapEvent = _centerMapEvent.asSharedFlow()
 
+    private val _navigateToDetailsEvent = MutableSharedFlow<Long>(replay = 0)
+    val navigateToDetailsEvent = _navigateToDetailsEvent.asSharedFlow()
+
     // UI state
     val uiState = combine(
         locationRepository.currentLocation,
@@ -72,19 +82,25 @@ class MainViewModel @Inject constructor(
         activeRideHolder.followedRoute,
         combine(
             isServiceRecordingRoute,
+            _isSavingRoute,
             _isStopRouteDialogOpen,
             _stopRouteDialogConfig
-        ) { recording, isVisible, config ->
-            recording to ConfirmDialogState(isVisible, config)
+        ) { recording, saving, isConfirmVisible, confirmConfig ->
+            val infoState = InfoDialogState(
+                isVisible = saving,
+                config = if (saving) infoDialogFactory.create(InfoDialogConfigState.SavingRoute) else null
+            )
+            Triple(recording, ConfirmDialogState(isConfirmVisible, confirmConfig), infoState)
         }
-    ) { loc, stats, dur, followed, (recording, dialog) ->
+    ) { loc, stats, dur, followed, (recording, confirmDialog, infoDialog) ->
         MainScreenUiState(
             currentLocation = loc,
             routeStats = stats,
             duration = dur,
             followedRoute = followed,
             isRecording = recording,
-            dialogState = dialog
+            dialogState = confirmDialog,
+            infoDialogState = infoDialog
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), MainScreenUiState())
 
@@ -116,10 +132,11 @@ class MainViewModel @Inject constructor(
                 }
             }
             is MainScreenEvent.SaveRoute -> {
-                if(isServiceRecordingRoute.value){
-                    viewModelScope.launch { saveRoute(name = event.name) }
-                    stopRecording()
+                if (isServiceRecordingRoute.value && !_isSavingRoute.value) {
                     _isStopRouteDialogOpen.value = false
+                    viewModelScope.launch {
+                        saveRouteAndNavigate(name = event.name)
+                    }
                 }
             }
             MainScreenEvent.CancelRoute -> {
@@ -207,15 +224,46 @@ class MainViewModel @Inject constructor(
         routeRepository.deleteRoute(currentRoute.value!!)
     }
 
-    private suspend fun saveRoute(name: String){
-        //TODO remove print and temp
-        println("route stopped")
-        println(name)
-        routeRepository.updateRoute(currentRoute.value!!.copy(
-            name = name,
-            numberOfPoints = locationRepository.routeStatsFlow.value.numberOfPointsOnRoute,
-            duration = locationRepository.duration.value,
-            distanceKm = locationRepository.routeStatsFlow.value.totalDistanceKm,
-        ))
+    private suspend fun saveRouteAndNavigate(name: String) {
+        val baseRoute = currentRoute.value ?: return
+        _isSavingRoute.value = true
+
+        try {
+            // 1. Collect stats and stop the recording
+            val finalPointsCount = locationRepository.routeStatsFlow.value.numberOfPointsOnRoute
+            val finalDuration = locationRepository.duration.value
+            val finalDistanceKm = locationRepository.routeStatsFlow.value.totalDistanceKm
+            stopRecording()
+
+            // 2. Save followed route if present
+            val followed = activeRideHolder.followedRoute.value
+            val plannedRouteId: Long? = if (followed != null) {
+                plannedRoutesRepository.insertRoute(
+                    PlannedRoute(
+                        targetDistanceMeters = followed.distanceMeters,
+                        points = followed.points
+                    )
+                )
+            } else {
+                null
+            }
+
+            // 3. Update current route with name and stats
+            val updatedRoute = baseRoute.copy(
+                name = name,
+                numberOfPoints = finalPointsCount,
+                duration = finalDuration,
+                distanceKm = finalDistanceKm,
+                plannedRouteId = plannedRouteId
+            )
+            routeRepository.updateRoute(updatedRoute)
+
+            // 4. Clear holder and navigate to route details
+            activeRideHolder.setFollowedRoute(null)
+            currentRoute.value = null
+            _navigateToDetailsEvent.emit(updatedRoute.id)
+        } finally {
+            _isSavingRoute.value = false
+        }
     }
 }

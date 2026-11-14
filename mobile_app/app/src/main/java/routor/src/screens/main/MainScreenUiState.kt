@@ -3,6 +3,7 @@ package routor.src.screens.main
 import org.maplibre.android.geometry.LatLng
 import routor.src.data.types.RouteStats
 import routor.src.dialogFactory.confirmDialog.ConfirmDialogState
+import routor.src.dialogFactory.infoDialog.InfoDialogState
 import routor.src.state.types.FollowedRoute
 
 data class MainScreenUiState(
@@ -11,5 +12,6 @@ data class MainScreenUiState(
     val duration: Long = 0L,
     val followedRoute: FollowedRoute? = null,
     val isRecording: Boolean = false,
-    val dialogState: ConfirmDialogState = ConfirmDialogState(false, null)
+    val dialogState: ConfirmDialogState = ConfirmDialogState(false, null),
+    val infoDialogState: InfoDialogState = InfoDialogState(false, null)
 )
