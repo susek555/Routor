@@ -42,6 +42,9 @@ object MapHelper {
     private const val END_ICON_ID = "end-icon"
     private const val END_SOURCE_ID = "end-source"
     private const val END_LAYER_ID = "end-layer"
+    private const val ARROW_ICON_ID = "route-arrow-icon"
+    private const val ARROW_SOURCE_ID = "route-arrow-source"
+    private const val ARROW_LAYER_ID = "route-arrow-layer"
 
     private fun init(context: Context) {
         MapLibre.getInstance(context, null, WellKnownTileServer.MapLibre)
@@ -135,6 +138,55 @@ object MapHelper {
         style.addLayerAbove(symbolLayer, ROUTE_LAYER_ID)
     }
 
+    private fun createArrowBitmap(): Bitmap {
+        val size = 48
+        val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+
+        val borderPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+            color = android.graphics.Color.parseColor("#1A73E8")
+            style = android.graphics.Paint.Style.FILL_AND_STROKE
+            strokeWidth = 4f
+            strokeJoin = android.graphics.Paint.Join.ROUND
+        }
+
+        val fillPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+            color = android.graphics.Color.WHITE
+            style = android.graphics.Paint.Style.FILL
+        }
+
+        val path = android.graphics.Path().apply {
+            moveTo(size / 2f, 6f)
+            lineTo(size - 10f, size - 8f)
+            lineTo(size / 2f, size - 16f)
+            lineTo(10f, size - 8f)
+            close()
+        }
+
+        canvas.drawPath(path, borderPaint)
+        canvas.drawPath(path, fillPaint)
+        return bitmap
+    }
+
+    private fun setupRouteArrowsLayer(style: Style) {
+        style.addImage(ARROW_ICON_ID, createArrowBitmap())
+
+        val emptySource = GeoJsonSource(ARROW_SOURCE_ID)
+        style.addSource(emptySource)
+
+        val symbolLayer = SymbolLayer(ARROW_LAYER_ID, ARROW_SOURCE_ID).apply {
+            setProperties(
+                PropertyFactory.iconImage(ARROW_ICON_ID),
+                PropertyFactory.iconRotate(org.maplibre.android.style.expressions.Expression.get("bearing")),
+                PropertyFactory.iconRotationAlignment(Property.ICON_ROTATION_ALIGNMENT_MAP),
+                PropertyFactory.iconAllowOverlap(true),
+                PropertyFactory.iconIgnorePlacement(true)
+            )
+        }
+
+        style.addLayerAbove(symbolLayer, ROUTE_LAYER_ID)
+    }
+
     private fun getMapView(context: Context, hasUserLocation: Boolean): MapView {
         init(context)
         val mapView = MapView(context)
@@ -143,6 +195,7 @@ object MapHelper {
             map.setStyle(MAP_STYLE_URL) { style ->
 
                 setupRouteLayer(style)
+                setupRouteArrowsLayer(style)
                 setupRouteStartLayer(style, context)
 
                 if(hasUserLocation) {
@@ -163,6 +216,58 @@ object MapHelper {
         }
 
         return mapView
+    }
+
+    private fun buildDirectionArrows(
+        points: List<LatLng>,
+        fractions: List<Double> = listOf(1.0 / 8.0, 3.0 / 8.0, 5.0 / 8.0, 7.0 / 8.0)
+    ): FeatureCollection {
+        if (points.size < 2) return FeatureCollection.fromFeatures(emptyList())
+
+        val cumulativeDistances = DoubleArray(points.size)
+        var totalDistance = 0.0
+        for (i in 1 until points.size) {
+            totalDistance += points[i - 1].distanceTo(points[i])
+            cumulativeDistances[i] = totalDistance
+        }
+
+        if (totalDistance <= 0.0) return FeatureCollection.fromFeatures(emptyList())
+
+        val features = fractions.mapNotNull { fraction ->
+            val targetDist = totalDistance * fraction
+            val segIndex = (1 until cumulativeDistances.size)
+                .firstOrNull { cumulativeDistances[it] >= targetDist }
+                ?: return@mapNotNull null
+
+            val segStart = points[segIndex - 1]
+            val segEnd = points[segIndex]
+            val segStartDist = cumulativeDistances[segIndex - 1]
+            val segLength = cumulativeDistances[segIndex] - segStartDist
+
+            val ratio = if (segLength > 0.0) (targetDist - segStartDist) / segLength else 0.0
+            val lat = segStart.latitude + (segEnd.latitude - segStart.latitude) * ratio
+            val lon = segStart.longitude + (segEnd.longitude - segStart.longitude) * ratio
+
+            val feature = Feature.fromGeometry(Point.fromLngLat(lon, lat))
+            feature.addNumberProperty("bearing", calculateBearing(segStart, segEnd))
+            feature
+        }
+
+        return FeatureCollection.fromFeatures(features)
+    }
+
+    private fun calculateBearing(from: LatLng, to: LatLng): Double {
+        val lat1 = Math.toRadians(from.latitude)
+        val lon1 = Math.toRadians(from.longitude)
+        val lat2 = Math.toRadians(to.latitude)
+        val lon2 = Math.toRadians(to.longitude)
+        val dLon = lon2 - lon1
+
+        val y = kotlin.math.sin(dLon) * kotlin.math.cos(lat2)
+        val x = kotlin.math.cos(lat1) * kotlin.math.sin(lat2) -
+                kotlin.math.sin(lat1) * kotlin.math.cos(lat2) * kotlin.math.cos(dLon)
+
+        return (Math.toDegrees(kotlin.math.atan2(y, x)) + 360.0) % 360.0
     }
 
     fun getMainScreenMapView(context: Context): MapView {
@@ -303,6 +408,9 @@ object MapHelper {
                 routeSource?.setGeoJson(FeatureCollection.fromFeatures(emptyList()))
                 startSource?.setGeoJson(FeatureCollection.fromFeatures(emptyList()))
                 endSource?.setGeoJson(FeatureCollection.fromFeatures(emptyList()))
+
+                style.getSourceAs<GeoJsonSource>(ARROW_SOURCE_ID)
+                    ?.setGeoJson(FeatureCollection.fromFeatures(emptyList()))
             }
         }
     }
@@ -313,6 +421,7 @@ object MapHelper {
                 val routeSource = style.getSourceAs<GeoJsonSource>(ROUTE_SOURCE_ID) ?: return@getStyle
                 val startSource = style.getSourceAs<GeoJsonSource>(START_SOURCE_ID) ?: return@getStyle
                 val endSource = style.getSourceAs<GeoJsonSource>(END_SOURCE_ID) ?: return@getStyle
+                val arrowSource = style.getSourceAs<GeoJsonSource>(ARROW_SOURCE_ID)
 
                 if (points.isEmpty()) {
                     clearRoute(mapView)
@@ -327,10 +436,13 @@ object MapHelper {
                 val lastPoint = Point.fromLngLat(points.last().longitude, points.last().latitude)
                 endSource.setGeoJson(Feature.fromGeometry(lastPoint))
 
-                // route
+                // route + 4 direction arrows
                 if (points.size >= 2) {
                     val mapboxPoints = points.map { Point.fromLngLat(it.longitude, it.latitude) }
                     routeSource.setGeoJson(Feature.fromGeometry(LineString.fromLngLats(mapboxPoints)))
+                    arrowSource?.setGeoJson(buildDirectionArrows(points))
+                } else {
+                    arrowSource?.setGeoJson(FeatureCollection.fromFeatures(emptyList()))
                 }
             }
         }
