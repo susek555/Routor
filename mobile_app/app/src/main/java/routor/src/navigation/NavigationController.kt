@@ -17,6 +17,7 @@ import routor.src.navigation.screens.RoutesNavRoute
 import routor.src.navigation.screens.generationsScreen
 import routor.src.navigation.screens.mainScreen
 import routor.src.navigation.screens.navigateToGenerations
+import routor.src.navigation.screens.navigateToMain
 import routor.src.navigation.screens.navigateToRouteDetails
 import routor.src.navigation.screens.navigateToRoutes
 import routor.src.navigation.screens.routeDetailsScreen
@@ -49,7 +50,8 @@ fun NavigationController() {
             )
 
             routeDetailsScreen(
-                onNavigateBack = { navController.navigateUp() }
+                onNavigateBack = { navController.navigateUp() },
+                onNavigateMain = { navController.navigateToMain() }
             )
 
             generationsScreen(
