@@ -7,6 +7,7 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import routor.src.data.database.PlannedRoutesDao
 import routor.src.data.database.PointsDao
 import routor.src.data.database.RoutesDao
 import routor.src.data.database.RoutesDatabase
@@ -36,5 +37,10 @@ object DatabaseModule {
     @Provides
     fun provideRoutesDao(database: RoutesDatabase): RoutesDao {
         return database.routesDao()
+    }
+
+    @Provides
+    fun providePlannedRoutesDao(database: RoutesDatabase): PlannedRoutesDao {
+        return database.plannedRoutesDao()
     }
 }

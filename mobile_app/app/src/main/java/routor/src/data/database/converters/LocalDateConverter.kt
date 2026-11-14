@@ -1,9 +1,9 @@
-package routor.src.data.database
+package routor.src.data.database.converters
 
 import androidx.room.TypeConverter
 import kotlinx.datetime.LocalDate
 
-class Converters {
+class LocalDateConverter {
 
     @TypeConverter
     fun fromLocalDate(date: LocalDate?): String? {
