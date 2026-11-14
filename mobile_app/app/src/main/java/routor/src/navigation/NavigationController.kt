@@ -41,7 +41,7 @@ fun NavigationController() {
             modifier = Modifier.padding(innerPadding)
         ) {
             mainScreen(
-                onNavigateToRoutes = { navController.navigateToBottomTab(RoutesNavRoute) }
+                onNavigateToRouteDetails = { id: Long -> navController.navigateToRouteDetails(id) }
             )
 
             routesScreen(

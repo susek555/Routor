@@ -69,17 +69,28 @@ class MainViewModel @Inject constructor(
         locationRepository.currentLocation,
         locationRepository.routeStatsFlow,
         locationRepository.duration,
-        isServiceRecordingRoute,
-        combine(_isStopRouteDialogOpen, _stopRouteDialogConfig) { isVisible, config ->
-            ConfirmDialogState(isVisible, config)
+        activeRideHolder.followedRoute,
+        combine(
+            isServiceRecordingRoute,
+            _isStopRouteDialogOpen,
+            _stopRouteDialogConfig
+        ) { recording, isVisible, config ->
+            recording to ConfirmDialogState(isVisible, config)
         }
-    ) { loc, stats, dur, recording, dialog ->
-        MainScreenUiState(loc, stats, dur, recording, dialog)
+    ) { loc, stats, dur, followed, (recording, dialog) ->
+        MainScreenUiState(
+            currentLocation = loc,
+            routeStats = stats,
+            duration = dur,
+            followedRoute = followed,
+            isRecording = recording,
+            dialogState = dialog
+        )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), MainScreenUiState())
 
      init {
-         // center map on user location
          viewModelScope.launch {
+             // center map on user location
              if (!isServiceRecordingRoute.value){
                  sendActionToLocationService(LocationService.ACTION_GET_SINGLE_LOCATION)
 
@@ -125,6 +136,10 @@ class MainViewModel @Inject constructor(
                         sendActionToLocationService(LocationService.ACTION_GET_SINGLE_LOCATION)
                     }
                 }
+            }
+
+            MainScreenEvent.ClearFollowedRoute -> {
+                activeRideHolder.setFollowedRoute(null)
             }
         }
     }

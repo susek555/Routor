@@ -45,6 +45,10 @@ object MapHelper {
     private const val ARROW_ICON_ID = "route-arrow-icon"
     private const val ARROW_SOURCE_ID = "route-arrow-source"
     private const val ARROW_LAYER_ID = "route-arrow-layer"
+    private const val PLANNED_ROUTE_SOURCE_ID = "planned-route-source"
+    private const val PLANNED_ROUTE_LAYER_ID = "planned-route-layer"
+    private const val PLANNED_ARROW_SOURCE_ID = "planned-arrow-source"
+    private const val PLANNED_ARROW_LAYER_ID = "planned-arrow-layer"
 
     private fun init(context: Context) {
         MapLibre.getInstance(context, null, WellKnownTileServer.MapLibre)
@@ -187,6 +191,42 @@ object MapHelper {
         style.addLayerAbove(symbolLayer, ROUTE_LAYER_ID)
     }
 
+    private fun setupPlannedRouteLayer(style: Style) {
+        style.addSource(GeoJsonSource(PLANNED_ROUTE_SOURCE_ID))
+
+        val lineLayer = org.maplibre.android.style.layers.LineLayer(PLANNED_ROUTE_LAYER_ID, PLANNED_ROUTE_SOURCE_ID).apply {
+            setProperties(
+                PropertyFactory.lineColor(android.graphics.Color.parseColor("#7E57C2")),
+                PropertyFactory.lineWidth(5f),
+                PropertyFactory.lineDasharray(arrayOf(2f, 1.5f)),
+                PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND),
+                PropertyFactory.lineCap(Property.LINE_CAP_ROUND),
+                PropertyFactory.lineOpacity(0.75f)
+            )
+        }
+
+        if (style.getLayer(ROUTE_LAYER_ID) != null) {
+            style.addLayerBelow(lineLayer, ROUTE_LAYER_ID)
+        } else {
+            style.addLayer(lineLayer)
+        }
+
+        if (style.getImage(ARROW_ICON_ID) == null) {
+            style.addImage(ARROW_ICON_ID, createArrowBitmap())
+        }
+        style.addSource(GeoJsonSource(PLANNED_ARROW_SOURCE_ID))
+        val arrowLayer = SymbolLayer(PLANNED_ARROW_LAYER_ID, PLANNED_ARROW_SOURCE_ID).apply {
+            setProperties(
+                PropertyFactory.iconImage(ARROW_ICON_ID),
+                PropertyFactory.iconRotate(org.maplibre.android.style.expressions.Expression.get("bearing")),
+                PropertyFactory.iconRotationAlignment(Property.ICON_ROTATION_ALIGNMENT_MAP),
+                PropertyFactory.iconAllowOverlap(true),
+                PropertyFactory.iconIgnorePlacement(true)
+            )
+        }
+        style.addLayerAbove(arrowLayer, PLANNED_ROUTE_LAYER_ID)
+    }
+
     private fun getMapView(context: Context, hasUserLocation: Boolean): MapView {
         init(context)
         val mapView = MapView(context)
@@ -196,9 +236,10 @@ object MapHelper {
 
                 setupRouteLayer(style)
                 setupRouteArrowsLayer(style)
+                setupPlannedRouteLayer(style)
                 setupRouteStartLayer(style, context)
 
-                if(hasUserLocation) {
+                if (hasUserLocation) {
                     setupUserLocationLayer(style, context)
                 } else {
                     setupRouteEndLayer(style, context)
@@ -473,5 +514,28 @@ object MapHelper {
     @JvmName("zoomToRouteFromPoints")
     fun zoomToRoute(mapView: MapView, points: List<routor.src.data.types.Point>, paddingPx: Int = 150) {
         zoomToRoute(mapView, points.map { LatLng(it.latitude, it.longitude) }, paddingPx)
+    }
+
+    fun displayPlannedRoute(mapView: MapView, points: List<LatLng>) {
+        mapView.getMapAsync { map ->
+            map.getStyle { style ->
+                val routeSource = style.getSourceAs<GeoJsonSource>(PLANNED_ROUTE_SOURCE_ID) ?: return@getStyle
+                val arrowSource = style.getSourceAs<GeoJsonSource>(PLANNED_ARROW_SOURCE_ID)
+
+                if (points.size < 2) {
+                    routeSource.setGeoJson(FeatureCollection.fromFeatures(emptyList()))
+                    arrowSource?.setGeoJson(FeatureCollection.fromFeatures(emptyList()))
+                    return@getStyle
+                }
+
+                val mapboxPoints = points.map { Point.fromLngLat(it.longitude, it.latitude) }
+                routeSource.setGeoJson(Feature.fromGeometry(LineString.fromLngLats(mapboxPoints)))
+                arrowSource?.setGeoJson(buildDirectionArrows(points))
+            }
+        }
+    }
+
+    fun clearPlannedRoute(mapView: MapView) {
+        displayPlannedRoute(mapView, emptyList())
     }
 }

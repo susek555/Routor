@@ -3,6 +3,7 @@ package routor.src.screens.main
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -16,6 +17,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -38,7 +40,7 @@ import routor.src.utils.formatTime
 
 @Composable
 fun MainScreen(
-    displayRoutesScreen: () -> Unit,
+    displayRoutesDetailsScreen: (id: Long) -> Unit,
     viewModel: MainViewModel
 ) {
     // UI state from viewModel
@@ -55,6 +57,15 @@ fun MainScreen(
     LaunchedEffect(Unit) {
         viewModel.centerMapEvent.collect { location ->
             MapHelper.centerCameraOnUserLocation(mapView, location)
+        }
+    }
+
+    // draw followed route
+    LaunchedEffect(uiState.followedRoute) {
+        val points = uiState.followedRoute?.points.orEmpty()
+        MapHelper.displayPlannedRoute(mapView, points)
+        if (points.size >= 2) {
+            MapHelper.zoomToRoute(mapView, points, paddingPx = 180)
         }
     }
 
@@ -123,6 +134,30 @@ fun MainScreen(
                         StatItem(label = "DISTANCE", value = "${"%.2f".format(uiState.routeStats.totalDistanceKm)} km")
                         StatItem(label = "SPEED", value = "${"%.2f".format(uiState.routeStats.speedKmh)} km/h")
                         StatItem(label = "DURATION", value = formatTime(uiState.duration))
+                    }
+
+                    if (uiState.followedRoute != null) {
+                        val targetKm = uiState.followedRoute!!.distanceMeters / 1000.0
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(
+                                text = "Target route: ${"%.2f".format(targetKm)} km",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = Color(0xFF7E57C2)
+                            )
+                            if (!uiState.isRecording) {
+                                TextButton(
+                                    onClick = { viewModel.onEvent(MainScreenEvent.ClearFollowedRoute) },
+                                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp)
+                                ) {
+                                    Text("Clear", fontSize = 12.sp)
+                                }
+                            }
+                        }
                     }
 
                     if (uiState.isRecording) {

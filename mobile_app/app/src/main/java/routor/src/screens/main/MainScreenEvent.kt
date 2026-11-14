@@ -7,4 +7,5 @@ sealed interface MainScreenEvent {
     data object CancelRoute: MainScreenEvent
     data class SaveRoute(val name: String): MainScreenEvent
     data object CenterMapOnCurrentLocation: MainScreenEvent
+    data object ClearFollowedRoute: MainScreenEvent
 }
