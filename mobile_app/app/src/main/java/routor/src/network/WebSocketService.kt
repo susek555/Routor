@@ -25,7 +25,7 @@ class WebSocketService(
     //TODO prints to logs
 
     fun observeRouteGeneration(taskId: String): Flow<RouteGenerationTaskStatus> = flow {
-        val url = "${baseUrl.trimEnd('/')}routes/ws/$taskId"
+        val url = "${baseUrl}routes/ws/$taskId"
 
         try {
             httpClient.webSocket(urlString = url) {

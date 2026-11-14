@@ -68,6 +68,6 @@ sealed interface GenerationsPhase {
 
 data class GenerationsScreenUiState(
     val centerPoint: LatLng? = null,
-    val targetDistanceKm: Float? = null,
+    val targetDistanceKm: Float = 5.0f,
     val phase: GenerationsPhase = GenerationsPhase.Configuring
 )

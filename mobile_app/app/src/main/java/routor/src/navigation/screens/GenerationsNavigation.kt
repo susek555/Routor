@@ -5,7 +5,7 @@ import androidx.navigation.NavController
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
 import kotlinx.serialization.Serializable
-import routor.src.screens.generations.GenerateScreen
+import routor.src.screens.generations.GenerationsScreen
 import routor.src.screens.generations.GenerationsViewModel
 
 @Serializable
@@ -19,9 +19,9 @@ fun NavGraphBuilder.generationsScreen(
     onNavigateToMain: () -> Unit
 ) {
     composable<GenerationsNavRoute> { backStackEntry ->
-        GenerateScreen(
+        GenerationsScreen(
             viewModel = hiltViewModel<GenerationsViewModel>(backStackEntry),
-            displayMainScreen = {
+            onNavigateToMain = {
                 onNavigateToMain()
             }
         )

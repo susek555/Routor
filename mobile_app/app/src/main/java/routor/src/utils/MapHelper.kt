@@ -307,7 +307,7 @@ object MapHelper {
         }
     }
 
-    fun displayFullRoute(mapView: MapView, points: List<routor.src.data.types.Point>) {
+    fun displayFullRoute(mapView: MapView, points: List<LatLng>) {
         mapView.getMapAsync { map ->
             map.getStyle { style ->
                 val routeSource = style.getSourceAs<GeoJsonSource>(ROUTE_SOURCE_ID) ?: return@getStyle
@@ -336,24 +336,30 @@ object MapHelper {
         }
     }
 
-    fun zoomToRoute(mapView: MapView, points: List<routor.src.data.types.Point>, paddingPx: Int = 150) {
+    @JvmName("displayFullRouteFromPoints")
+    fun displayFullRoute(mapView: MapView, points: List<routor.src.data.types.Point>) {
+        displayFullRoute(mapView, points.map { LatLng(it.latitude, it.longitude) })
+    }
+
+    fun zoomToRoute(mapView: MapView, points: List<LatLng>, paddingPx: Int = 150) {
         if (points.size < 2) return
 
         mapView.getMapAsync { map ->
             val builder = LatLngBounds.Builder()
-
-            points.forEach { point ->
-                builder.include(LatLng(point.latitude, point.longitude))
-            }
+            points.forEach { builder.include(it) }
 
             try {
                 val bounds = builder.build()
                 val cameraUpdate = CameraUpdateFactory.newLatLngBounds(bounds, paddingPx)
-
-                map.animateCamera(cameraUpdate, 1000)
+                map.animateCamera(cameraUpdate, 700)
             } catch (e: Exception) {
                 e.printStackTrace()
             }
         }
+    }
+
+    @JvmName("zoomToRouteFromPoints")
+    fun zoomToRoute(mapView: MapView, points: List<routor.src.data.types.Point>, paddingPx: Int = 150) {
+        zoomToRoute(mapView, points.map { LatLng(it.latitude, it.longitude) }, paddingPx)
     }
 }
