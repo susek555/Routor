@@ -53,8 +53,7 @@ class User(Base):
         nullable=False,
     )
 
-    # Relacje
-    devices: Mapped[list["UserDevice"]] = relationship(
+    refresh_tokens: Mapped[list["RefreshToken"]] = relationship(
         back_populates="user",
         cascade="all, delete-orphan",
     )
@@ -67,8 +66,8 @@ class User(Base):
     )
 
 
-class UserDevice(Base):
-    __tablename__ = "user_devices"
+class RefreshToken(Base):
+    __tablename__ = "refresh_tokens"
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -76,18 +75,21 @@ class UserDevice(Base):
         server_default=func.gen_random_uuid(),
     )
     user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
         ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
-    fcm_token: Mapped[str] = mapped_column(String(512), unique=True, nullable=False)
-    last_used_at: Mapped[datetime] = mapped_column(
+    token_hash: Mapped[str] = mapped_column(String(128), unique=True, nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.current_timestamp(),
         nullable=False,
     )
 
-    user: Mapped["User"] = relationship(back_populates="devices")
+    user: Mapped["User"] = relationship(back_populates="refresh_tokens")
 
 
 class RouteVariant(Base):

@@ -10,15 +10,17 @@ CREATE TABLE IF NOT EXISTS users (
 );
 
 
--- 2. USER_DEVICES
-CREATE TABLE IF NOT EXISTS user_devices (
+-- 2. REFRESH_TOKENS
+CREATE TABLE IF NOT EXISTS refresh_tokens (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    fcm_token VARCHAR(512) UNIQUE NOT NULL,
-    last_used_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+    token_hash VARCHAR(128) UNIQUE NOT NULL,
+    expires_at TIMESTAMPTZ NOT NULL,
+    revoked_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX IF NOT EXISTS ix_user_devices_user_id ON user_devices (user_id);
+CREATE INDEX IF NOT EXISTS ix_refresh_tokens_user_id ON refresh_tokens (user_id);
 
 
 -- 3. ROUTE_VARIANTS
