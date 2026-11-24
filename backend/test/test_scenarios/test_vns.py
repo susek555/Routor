@@ -5,16 +5,16 @@ import time
 
 import folium
 from folium import LayerControl
-from src.generate_routes.data.geo_point import GeoPoint
-from src.generate_routes.algorithm.evaluator import RouteEvaluator
-from src.generate_routes.algorithm.common_utils import get_heading_rad, haversine
-from src.generate_routes.algorithm.evaluator_params import BoundingBoxEnum, EvaluatorParams
 from src.generate_routes.algorithm.checkpoint_refiner import CheckpointRefiner
 from src.generate_routes.algorithm.checkpoints_generator import CheckpointsGenerator
+from src.generate_routes.algorithm.common_utils import get_heading_rad, haversine
+from src.generate_routes.algorithm.evaluator import RouteEvaluator
+from src.generate_routes.algorithm.evaluator_params import BoundingBoxEnum, EvaluatorParams
 from src.generate_routes.algorithm.snapper import Snapper
 from src.generate_routes.algorithm.subgrapher import Subgrapher
 from src.generate_routes.algorithm.vns.vns_generator import VNSLoopGenerator
 from src.generate_routes.algorithm.vns.vns_params import VNSParams
+from src.generate_routes.data.geo_point import GeoPoint
 from src.generate_routes.graph_builder.graph_builder import GraphBuilder
 from src.generate_routes.graph_builder.graph_converter import GraphConverter
 
@@ -94,7 +94,7 @@ def plot_routes_comparison_map(
         layer_name = f"Trasa #{idx} | {length / 1000.0:.2f} km ({sign}{diff_meters:.0f} m / {sign}{diff_pct:.1f}%)"
         route_group = folium.FeatureGroup(name=layer_name, show=True)
 
-        reconstructed_pts = converter.reconstruct_route_from_node_ids(node_path)
+        reconstructed_pts, total_distance = converter.reconstruct_route_from_node_ids(node_path)
         coords = [(p.latitude, p.longitude) for p in reconstructed_pts]
 
         folium.PolyLine(
@@ -300,8 +300,8 @@ def visualize_all_routes_overlaps(
 
 
 def main():
-    # center = GeoPoint(latitude=50.45, longitude=23.423)  # TL
-    center = GeoPoint(latitude=52.323832, longitude=20.948670)
+    center = GeoPoint(latitude=50.45, longitude=23.423)  # TL
+    # center = GeoPoint(latitude=52.323832, longitude=20.948670)
     # center = GeoPoint(latitude=52.23, longitude=21.00)  # WWA
     # center = GeoPoint(latitude=50.485, longitude=23.495)  # Justynowka
     radius_meters = 5000.0
@@ -390,8 +390,7 @@ def main():
             print("⚠️ Nie udało się wyznaczyć poprawnej pętli VNS.")
             continue
 
-        reconstructed_pts = converter.reconstruct_route_from_node_ids(route_nodes)
-        actual_distance = calculate_reconstructed_distance(reconstructed_pts)
+        reconstructed_pts, actual_distance = converter.reconstruct_route_from_node_ids(route_nodes)
 
         print(
             f"⏱️ Czas generowania: {elapsed_ms:.1f} ms | Długość: {actual_distance:.1f} m | Fitness: {route_fitness:.4f}"

@@ -10,3 +10,5 @@ poland-latest.osm.pbf
 *.tif
 *.html
 .env
+*.png
+temp.md

@@ -20,7 +20,6 @@ class ProgressTaskStatePayload(BaseModel):
     total: int
 
 
-# Zamiast: Union[FailedTaskStatePayload, ProgressTaskStatePayload, None]
 type TaskPayloadType = FailedTaskStatePayload | ProgressTaskStatePayload | None
 
 
