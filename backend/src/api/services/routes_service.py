@@ -12,11 +12,14 @@ logger = logging.getLogger(__name__)
 
 class RouteService:
     @staticmethod
-    def dispatch(payload: TaskPayload) -> str:
-        logger.info(f"Scheduling route generation for user {payload.user_id}...")
+    def dispatch(payload: TaskPayload, user_id: str) -> str:
+        logger.info(f"Scheduling route generation for user {user_id}...")
+        task_data = payload.model_dump(mode="json")
+        task_data["user_id"] = str(user_id)
+
         try:
             task = generate_route_task.delay(payload.model_dump(mode="json"))
-            logger.info(f"Route task {task.id} scheduled for user {payload.user_id}.")
+            logger.info(f"Route task {task.id} scheduled for user {user_id}.")
             return task.id
         except OperationalError as exc:
             logger.error(f"Celery broker unavailable: {exc}")

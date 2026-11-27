@@ -20,6 +20,7 @@ dependencies = [
     "networkx>=3.6.1",
     "osmnx>=2.1.1",
     "psycopg2-binary>=2.9.13",
+    "pwdlib>=0.3.0",
     "pytest",
     "python-dotenv>=1.2.2",
     "rasterio>=1.5.1",

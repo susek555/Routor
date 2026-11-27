@@ -1,7 +1,9 @@
 import os
 from collections.abc import AsyncGenerator
 from contextlib import contextmanager
+from typing import Annotated
 
+from fastapi import Depends
 from sqlalchemy import create_engine
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
@@ -93,19 +95,4 @@ def get_sync_db():
         session.close()
 
 
-# async def get_dummies():
-#     async with AsyncSessionLocal() as session:
-#         async with session.begin():
-#             result = await session.execute(text("SELECT * FROM dummy"))
-#             return result.mappings().all()
-
-
-# async def get_single_dummy_message():
-#     async with AsyncSessionLocal() as session:
-#         async with session.begin():
-#             result = await session.execute(text("SELECT * FROM dummy LIMIT 1"))
-#             row = result.mappings().one_or_none()
-#             if row is not None:
-#                 return row["message"]
-
-#             return None
+DbSession = Annotated[AsyncSession, Depends(get_db)]
