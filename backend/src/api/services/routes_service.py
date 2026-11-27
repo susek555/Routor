@@ -1,5 +1,5 @@
-# services/route_dispatcher.py
 import logging
+import uuid
 
 from kombu.exceptions import OperationalError
 
@@ -11,14 +11,17 @@ logger = logging.getLogger(__name__)
 
 
 class RouteService:
+    """Dispatches route generation jobs to the Celery worker."""
+
     @staticmethod
-    def dispatch(payload: TaskPayload, user_id: str) -> str:
+    def dispatch(payload: TaskPayload, user_id: uuid.UUID | str) -> str:
+        """Schedules route generation with user context included in the task payload."""
         logger.info(f"Scheduling route generation for user {user_id}...")
         task_data = payload.model_dump(mode="json")
         task_data["user_id"] = str(user_id)
 
         try:
-            task = generate_route_task.delay(payload.model_dump(mode="json"))
+            task = generate_route_task.delay(task_data)
             logger.info(f"Route task {task.id} scheduled for user {user_id}.")
             return task.id
         except OperationalError as exc:
